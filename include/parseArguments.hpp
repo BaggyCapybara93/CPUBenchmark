@@ -11,11 +11,13 @@ enum class CommandMode{
 
 class ParseArguments{
     private:
-        CommandMode mode_ = CommandMode::Invalid;
-        bool saveResults_ = true;
-        int threadCount_ = std::thread::hardware_concurrency();
-        int iterations_ = 1000000;
-        int repeatCount_ = 1;
+        CommandMode _mode = CommandMode::Invalid;
+        bool _saveResults = true;
+        int _threadCount = std::thread::hardware_concurrency();
+        int _iterations = 999999;
+        int _repeatCount = 1;
+        int _matrixMultiplySize = 128;
+        int _intensityMultiplier = 50;
 
         void parse(int argc, char* argv[]);
     public:
@@ -27,8 +29,8 @@ class ParseArguments{
         int getThreadCount() const;
         int getIterations() const;
         int getRepeatCount() const;
-
-        //Check compression
+        int getMatrixMultiplySize() const;
+        int getIntensityMultiplier() const;
         bool shouldSaveResults() const;
         
         //Print
