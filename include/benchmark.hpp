@@ -14,8 +14,8 @@ public:
     static void matrixMultiplyBenchmark(int iterations);
     static void branchPredictionBenchmark(int iterations);
     static void dryRun(int iterations);
-    static std::unordered_map<std::string, std::vector<double>> runMultithreadedBenchmark(int numThreads, int iterationsPerThread);
-    static std::unordered_map<std::string, std::vector<double>> runSingleThreadedBenchmark(int iterations);
+    static std::unordered_map<std::string, std::vector<double>> runMultithreadedBenchmark(int numThreads, int iterationsPerThread, const int intensityMultiplier = 50, const int matrixMultiplySize = 128);
+    static std::unordered_map<std::string, std::vector<double>> runSingleThreadedBenchmark(int iterations, const int intensityMultiplier = 50, const int matrixMultiplySize = 128);
 
     //Memory Benchmarks
     static void runMemoryBandwidthTest(size_t size);
