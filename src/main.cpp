@@ -15,7 +15,7 @@ int main(int argc, char* argv[]){
     switch(args.getMode()){
         case CommandMode::RunSingleThreaded:{
             for(size_t i = 0; i < args.getRepeatCount(); i++){
-                std::unordered_map<std::string, std::vector<double>> runScore = benchmark.runSingleThreadedBenchmark(args.getIterations());
+                std::unordered_map<std::string, std::vector<double>> runScore = benchmark.runSingleThreadedBenchmark(args.getIterations(), args.getIntensityMultiplier(), args.getMatrixMultiplySize());
                 br.addScore(runScore);
             }
 
@@ -35,7 +35,7 @@ int main(int argc, char* argv[]){
         }
         case CommandMode::RunMultiThreaded:{
             for(size_t i = 0; i < args.getRepeatCount(); i++){
-                std::unordered_map<std::string, std::vector<double>> runScore = benchmark.runMultithreadedBenchmark(args.getThreadCount(), args.getIterations());
+                std::unordered_map<std::string, std::vector<double>> runScore = benchmark.runMultithreadedBenchmark(args.getThreadCount(), args.getIterations(), args.getIntensityMultiplier(), args.getMatrixMultiplySize());
                 br.addScore(runScore);
             }
 
