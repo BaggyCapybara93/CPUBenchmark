@@ -2,7 +2,6 @@
 #include <iostream>
 #include <filesystem>
 
-
 //Constructor
     BenchmarkReport::BenchmarkReport(const std::string& saveFolder) : saveFolder_(saveFolder){}
 

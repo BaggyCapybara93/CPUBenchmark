@@ -5,7 +5,7 @@
 #include <thread>
 
 
-void Benchmark::floatingPointTask(int iterations) {
+void Benchmark::floatingPointBenchmark(int iterations) {
     volatile double result = 0.0;
     for (int i = 0; i < iterations; ++i) {
         result += std::sin(i) * std::cos(i) / std::tan(i + 1);
@@ -19,16 +19,29 @@ void Benchmark::integerArithmeticBenchmark(int iterations){
     }
 }
 
-void Benchmark::matrixMultiplyTask(int size) {
+void Benchmark::matrixMultiplyBenchmark(int size) {
     std::vector<std::vector<double>> matrix(size, std::vector<double>(size, 1.0));
     for (int i = 0; i < size; ++i)
         for (int j = 0; j < size; ++j)
             matrix[i][j] *= std::sin(i) * std::cos(j);
 }
 
+void Benchmark::branchPredictionBenchmark(int iterations){
+    volatile int sum = 0;
+
+    for(int i = 0; i < iterations; ++i){
+        if(i < iterations - 1) sum++;
+    }
+
+    for(int i = 0; i < iterations; ++i){
+        if(rand() % 2 == 0) sum++;
+    }
+}
+
 void Benchmark::dryRun(int iterations = 1000){
-    floatingPointTask(iterations);
+    floatingPointBenchmark(iterations);
     integerArithmeticBenchmark(iterations);
+    branchPredictionBenchmark(iterations);
 }
 
 std::unordered_map<std::string, std::vector<double>> Benchmark::runMultithreadedBenchmark(int numThreads, int iterationsPerThread) {
@@ -40,7 +53,7 @@ std::unordered_map<std::string, std::vector<double>> Benchmark::runMultithreaded
     // Run floating-point benchmark first
     std::vector<std::thread> floatThreads;
     for (int i = 0; i < numThreads; ++i) {
-        floatThreads.emplace_back(Benchmark::floatingPointTask, iterationsPerThread);
+        floatThreads.emplace_back(Benchmark::floatingPointBenchmark, iterationsPerThread);
     }
     for (auto& thread : floatThreads) {
         thread.join();
@@ -73,7 +86,7 @@ std::unordered_map<std::string, std::vector<double>> Benchmark::runMultithreaded
     
     std::vector<std::thread> matrixThreads;
     for (int i = 0; i < numThreads; ++i) {
-        matrixThreads.emplace_back(Benchmark::matrixMultiplyTask, matrixSize);
+        matrixThreads.emplace_back(Benchmark::matrixMultiplyBenchmark, matrixSize);
     }
     for (auto& thread : matrixThreads) {
         thread.join();
@@ -86,8 +99,24 @@ std::unordered_map<std::string, std::vector<double>> Benchmark::runMultithreaded
     int matrixOps = matrixSize * matrixSize; // actual number of operations
     scores["Matrix Multiply"].push_back(getScore(elapsedMatrix.count(), iterationsPerThread));
 
+    //Branch Prediction Benchmark
+    auto startBranch = std::chrono::high_resolution_clock::now();
+    
+    std::vector<std::thread> branchThreads;
+    for (int i = 0; i < numThreads; ++i) {
+        branchThreads.emplace_back(Benchmark::branchPredictionBenchmark, iterationsPerThread);
+    }
+    for (auto& thread : branchThreads) {
+        thread.join();
+    }
+
+    auto endBranch = std::chrono::high_resolution_clock::now();
+    std::chrono::duration<double> elapsedBranch = endBranch - startBranch;
+    std::cout << "Branch prediction benchmark completed in " << elapsedBranch.count() << " seconds.\n";
+    scores["Branch Prediction"].push_back(getScore(elapsedBranch.count(), iterationsPerThread));
+
     // Return total duration
-    double totalTime = elapsedFloat.count() + elapsedInt.count() + elapsedMatrix.count();
+    double totalTime = elapsedFloat.count() + elapsedInt.count() + elapsedMatrix.count() + elapsedBranch.count();
     std::cout << "Total multi-threaded benchmark time: " << totalTime << " seconds.\n";
     scores["Combined"].push_back(getScore(totalTime, iterationsPerThread));
 
@@ -101,7 +130,7 @@ std::unordered_map<std::string, std::vector<double>> Benchmark::runSingleThreade
     dryRun();
 
     auto startFloat = std::chrono::high_resolution_clock::now();
-    Benchmark::floatingPointTask(iterations);
+    Benchmark::floatingPointBenchmark(iterations);
 
     auto endFloat = std::chrono::high_resolution_clock::now();
     std::chrono::duration<double> elapsedFloat = endFloat - startFloat;
@@ -120,7 +149,7 @@ std::unordered_map<std::string, std::vector<double>> Benchmark::runSingleThreade
 
     int matrixSize = static_cast<int>(std::sqrt(iterations));
     auto startMatrix = std::chrono::high_resolution_clock::now();
-    Benchmark::matrixMultiplyTask(matrixSize);
+    Benchmark::matrixMultiplyBenchmark(matrixSize);
 
     auto endMatrix = std::chrono::high_resolution_clock::now();
     std::chrono::duration<double> elapsedMatrix = endMatrix - startMatrix;
@@ -128,6 +157,15 @@ std::unordered_map<std::string, std::vector<double>> Benchmark::runSingleThreade
 
     int matrixOps = matrixSize * matrixSize; // actual number of operations
     scores["Matrix Multiply"].push_back(getScore(elapsedMatrix.count(), iterations));
+
+    auto startBranch = std::chrono::high_resolution_clock::now();
+    Benchmark::branchPredictionBenchmark(iterations);
+
+    auto endBranch = std::chrono::high_resolution_clock::now();
+    std::chrono::duration<double> elapsedBranch = endBranch - startBranch;
+    std::cout << "Bench prediction benchmark completed in " << elapsedBranch.count() << " seconds.\n";
+
+    scores["Bench Prediction"].push_back(getScore(elapsedBranch.count(), iterations));
 
     double totalTime = elapsedFloat.count() + elapsedInt.count() + elapsedMatrix.count();
     std::cout << "Total multi-threaded benchmark time: " << totalTime << " seconds.\n";
