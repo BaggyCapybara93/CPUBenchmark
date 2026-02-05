@@ -97,7 +97,6 @@ std::unordered_map<std::string, std::vector<double>> Benchmark::runMultithreaded
     std::chrono::duration<double> elapsedMatrix = endMatrix - startMatrix;
     std::cout << "Matrix multiply benchmark completed in " << elapsedMatrix.count() << " seconds.\n";
 
-    int matrixOps = matrixSize * matrixSize; // actual number of operations
     scores["Matrix Multiply"].push_back(getScore(elapsedMatrix.count(), iterationsPerThread));
 
     //Branch Prediction Benchmark
