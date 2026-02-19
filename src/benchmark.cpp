@@ -168,7 +168,7 @@ std::unordered_map<std::string, std::vector<double>> Benchmark::runSingleThreade
 
     scores["Branch Prediction"].push_back(getScore(elapsedBranch.count(), iterations));
 
-    double totalTime = elapsedFloat.count() + elapsedInt.count() + elapsedMatrix.count();
+    double totalTime = elapsedFloat.count() + elapsedInt.count() + elapsedMatrix.count() + elapsedBranch.count();
     std::cout << "Total multi-threaded benchmark time: " << totalTime << " seconds.\n";
     
     scores["Combined"].push_back(getScore(totalTime, iterations));
