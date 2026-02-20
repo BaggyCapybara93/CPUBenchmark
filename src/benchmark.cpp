@@ -38,6 +38,62 @@ void Benchmark::branchPredictionBenchmark(int iterations){
     }
 }
 
+void Benchmark::nBodyBenchmark(int nBodies, int steps) {
+    struct Body {
+        double x, y, z;
+        double vx, vy, vz;
+        double mass;
+    };
+
+    std::vector<Body> bodies(nBodies);
+
+    // Initialize bodies with deterministic values
+    for (int i = 0; i < nBodies; ++i) {
+        bodies[i].x = i * 0.01;
+        bodies[i].y = i * 0.02;
+        bodies[i].z = i * 0.03;
+        bodies[i].vx = bodies[i].vy = bodies[i].vz = 0.0;
+        bodies[i].mass = 1.0;
+    }
+
+    const double G = 6.67430e-11;
+    const double dt = 0.01;
+
+    for (int step = 0; step < steps; ++step) {
+        for (int i = 0; i < nBodies; ++i) {
+            double ax = 0.0, ay = 0.0, az = 0.0;
+
+            for (int j = 0; j < nBodies; ++j) {
+                if (i == j) continue;
+
+                double dx = bodies[j].x - bodies[i].x;
+                double dy = bodies[j].y - bodies[i].y;
+                double dz = bodies[j].z - bodies[i].z;
+
+                double distSqr = dx*dx + dy*dy + dz*dz + 1e-9;
+                double invDist = 1.0 / std::sqrt(distSqr);
+                double invDist3 = invDist * invDist * invDist;
+
+                double force = G * bodies[j].mass * invDist3;
+
+                ax += dx * force;
+                ay += dy * force;
+                az += dz * force;
+            }
+
+            bodies[i].vx += ax * dt;
+            bodies[i].vy += ay * dt;
+            bodies[i].vz += az * dt;
+        }
+
+        for (int i = 0; i < nBodies; ++i) {
+            bodies[i].x += bodies[i].vx * dt;
+            bodies[i].y += bodies[i].vy * dt;
+            bodies[i].z += bodies[i].vz * dt;
+        }
+    }
+}
+
 void Benchmark::dryRun(int iterations = 1000){
     floatingPointBenchmark(iterations);
     integerArithmeticBenchmark(iterations);
@@ -116,8 +172,28 @@ std::unordered_map<std::string, std::vector<double>> Benchmark::runMultithreaded
     std::cout << "Branch prediction benchmark completed in " << elapsedBranch.count() << " seconds.\n";
     scores["Branch Prediction"].push_back(getScore(elapsedBranch.count(), iterationsPerThread));
 
+    //Nbody Benchmark
+    int steps = 10;
+    int bodies = std::sqrt(iterationsPerThread);
+    auto startNbody = std::chrono::high_resolution_clock::now();
+
+    std::vector<std::thread> nbodyThreads;
+    for (int i = 0; i < numThreads; ++i) {
+        nbodyThreads.emplace_back(Benchmark::nBodyBenchmark, bodies, steps);
+    }
+    for (auto& thread : nbodyThreads) {
+        thread.join();
+    }
+
+    auto endNbody = std::chrono::high_resolution_clock::now();
+    std::chrono::duration<double> elapsedNbody = endNbody - startNbody;
+    double nbodyOps = bodies * bodies * steps;
+    std::cout << "NBody benchmark completed in " << elapsedNbody.count() << " seconds.\n";
+    scores["NBody"].push_back(getScore(elapsedNbody.count(), nbodyOps));
+
+
     // Return total duration
-    double totalTime = elapsedFloat.count() + elapsedInt.count() + elapsedMatrix.count() + elapsedBranch.count();
+    double totalTime = elapsedFloat.count() + elapsedInt.count() + elapsedMatrix.count() + elapsedBranch.count() + elapsedNbody.count();
     std::cout << "Total multi-threaded benchmark time: " << totalTime << " seconds.\n";
     scores["Combined"].push_back(getScore(totalTime, iterationsPerThread));
 
@@ -169,7 +245,20 @@ std::unordered_map<std::string, std::vector<double>> Benchmark::runSingleThreade
 
     scores["Branch Prediction"].push_back(getScore(elapsedBranch.count(), iterations));
 
-    double totalTime = elapsedFloat.count() + elapsedInt.count() + elapsedMatrix.count() + elapsedBranch.count();
+    //NBodies Benchmark
+    int steps = 10;
+    int bodies = std::sqrt(iterations);
+    auto startNbody = std::chrono::high_resolution_clock::now();
+    Benchmark::nBodyBenchmark(bodies, steps);
+
+    auto endNbody = std::chrono::high_resolution_clock::now();
+    std::chrono::duration<double> elapsedNbody = endNbody - startNbody;
+    double nbodyOps = bodies * bodies * steps;
+    std::cout << "Nbody benchmark completed in " << elapsedNbody.count() << " seconds.\n";
+
+    scores["Nbody"].push_back(getScore(elapsedNbody.count(), nbodyOps));
+
+    double totalTime = elapsedFloat.count() + elapsedInt.count() + elapsedMatrix.count() + elapsedBranch.count() + elapsedNbody.count();
     std::cout << "Total single-threaded benchmark time: " << totalTime << " seconds.\n";
     
     scores["Combined"].push_back(getScore(totalTime, iterations));
