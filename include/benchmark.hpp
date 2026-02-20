@@ -23,4 +23,8 @@ public:
 
     //Score calculator
     static double getScore(double intake, int iterations);
+
+    //Time
+    template <typename Function, typename... Args>
+    static double time(Function&& function, Args&& ... args);
 };

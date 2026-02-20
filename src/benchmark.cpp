@@ -4,6 +4,14 @@
 #include <iostream>
 #include <thread>
 
+//Time
+template <typename Function, typename... Args>
+double Benchmark::time(Function&& function, Args&&... args) {
+    auto start = std::chrono::high_resolution_clock::now();
+    std::invoke(std::forward<Function>(function), std::forward<Args>(args)...);
+    auto end = std::chrono::high_resolution_clock::now();
+    return std::chrono::duration<double>(end - start).count();
+}
 
 void Benchmark::floatingPointBenchmark(int iterations) {
     volatile double result = 0.0;
@@ -106,94 +114,85 @@ std::unordered_map<std::string, std::vector<double>> Benchmark::runMultithreaded
 
     dryRun();
 
-    auto startFloat = std::chrono::high_resolution_clock::now();
     // Run floating-point benchmark first
-    std::vector<std::thread> floatThreads;
-    for (int i = 0; i < numThreads; ++i) {
-        floatThreads.emplace_back(Benchmark::floatingPointBenchmark, iterationsPerThread);
-    }
-    for (auto& thread : floatThreads) {
-        thread.join();
-    }
+    double elapsedFloat = Benchmark::time([&]() {
+        std::vector<std::thread> floatThreads;
+        for (int i = 0; i < numThreads; ++i) {
+            floatThreads.emplace_back(Benchmark::floatingPointBenchmark, iterationsPerThread);
+        }
+        for (auto& thread : floatThreads) {
+            thread.join();
+        }
+    });
 
-    auto endFloat = std::chrono::high_resolution_clock::now();
-    std::chrono::duration<double> elapsedFloat = endFloat - startFloat;
-    std::cout << "Floating-point benchmark completed in " << elapsedFloat.count() << " seconds.\n";
-    scores["Floating-point"].push_back(getScore(elapsedFloat.count(), iterationsPerThread));
+    std::cout << "Floating-point benchmark completed in " << elapsedFloat << " seconds.\n";
+    scores["Floating-point"].push_back(getScore(elapsedFloat, iterationsPerThread));
 
     // Run integer arithmetic benchmark after floating-point benchmark
-    auto startInt = std::chrono::high_resolution_clock::now();
-    
-    std::vector<std::thread> intThreads;
-    for (int i = 0; i < numThreads; ++i) {
-        intThreads.emplace_back(Benchmark::integerArithmeticBenchmark, iterationsPerThread);
-    }
-    for (auto& thread : intThreads) {
-        thread.join();
-    }
-
-    auto endInt = std::chrono::high_resolution_clock::now();
-    std::chrono::duration<double> elapsedInt = endInt - startInt;
-    std::cout << "Integer arithmetic benchmark completed in " << elapsedInt.count() << " seconds.\n";
-    scores["Integer Arithmetic"].push_back(getScore(elapsedInt.count(), iterationsPerThread));
+    double elapsedInt = Benchmark::time([&]() {
+        std::vector<std::thread> intThreads;
+        for (int i = 0; i < numThreads; ++i) {
+            intThreads.emplace_back(Benchmark::integerArithmeticBenchmark, iterationsPerThread);
+        }
+        for (auto& thread : intThreads) {
+            thread.join();
+        }
+    });
+    std::cout << "Integer arithmetic benchmark completed in " << elapsedInt << " seconds.\n";
+    scores["Integer Arithmetic"].push_back(getScore(elapsedInt, iterationsPerThread));
 
     //Matrix Multiplication Benchmark
     int matrixSize = matrixMultiplySize * std::sqrt(intensityMultiplier);
-    auto startMatrix = std::chrono::high_resolution_clock::now();
-    
-    std::vector<std::thread> matrixThreads;
-    for (int i = 0; i < numThreads; ++i) {
-        matrixThreads.emplace_back(Benchmark::matrixMultiplyBenchmark, matrixSize);
-    }
-    for (auto& thread : matrixThreads) {
-        thread.join();
-    }
+    double elapsedMatrix = Benchmark::time([&]() {
+        std::vector<std::thread> matrixThreads;
+        for (int i = 0; i < numThreads; ++i) {
+            matrixThreads.emplace_back(Benchmark::matrixMultiplyBenchmark, matrixSize);
+        }
+        for (auto& thread : matrixThreads) {
+            thread.join();
+        }
+    });
 
     auto endMatrix = std::chrono::high_resolution_clock::now();
     int matrixOps = matrixSize * matrixSize * numThreads; // actual number of operations
-    std::chrono::duration<double> elapsedMatrix = endMatrix - startMatrix;
-    std::cout << "Matrix multiply benchmark completed in " << elapsedMatrix.count() << " seconds.\n";
+    std::cout << "Matrix multiply benchmark completed in " << elapsedMatrix << " seconds.\n";
 
-    scores["Matrix Multiply"].push_back(getScore(elapsedMatrix.count(), matrixOps));
+    scores["Matrix Multiply"].push_back(getScore(elapsedMatrix, matrixOps));
 
     //Branch Prediction Benchmark
-    auto startBranch = std::chrono::high_resolution_clock::now();
-    
-    std::vector<std::thread> branchThreads;
-    for (int i = 0; i < numThreads; ++i) {
-        branchThreads.emplace_back(Benchmark::branchPredictionBenchmark, iterationsPerThread);
-    }
-    for (auto& thread : branchThreads) {
-        thread.join();
-    }
+    double elapsedBranch = Benchmark::time([&]() {
+        std::vector<std::thread> branchThreads;
+        for (int i = 0; i < numThreads; ++i) {
+            branchThreads.emplace_back(Benchmark::branchPredictionBenchmark, iterationsPerThread);
+        }
+        for (auto& thread : branchThreads) {
+            thread.join();
+        }
+    });
 
-    auto endBranch = std::chrono::high_resolution_clock::now();
-    std::chrono::duration<double> elapsedBranch = endBranch - startBranch;
-    std::cout << "Branch prediction benchmark completed in " << elapsedBranch.count() << " seconds.\n";
-    scores["Branch Prediction"].push_back(getScore(elapsedBranch.count(), iterationsPerThread));
+    std::cout << "Branch prediction benchmark completed in " << elapsedBranch << " seconds.\n";
+    scores["Branch Prediction"].push_back(getScore(elapsedBranch, iterationsPerThread));
 
     //Nbody Benchmark
     int steps = 10;
     int bodies = std::sqrt(iterationsPerThread);
-    auto startNbody = std::chrono::high_resolution_clock::now();
 
-    std::vector<std::thread> nbodyThreads;
-    for (int i = 0; i < numThreads; ++i) {
-        nbodyThreads.emplace_back(Benchmark::nBodyBenchmark, bodies, steps);
-    }
-    for (auto& thread : nbodyThreads) {
-        thread.join();
-    }
-
-    auto endNbody = std::chrono::high_resolution_clock::now();
-    std::chrono::duration<double> elapsedNbody = endNbody - startNbody;
+    double elapsedNbody = Benchmark::time([&]() {
+        std::vector<std::thread> nbodyThreads;
+        for (int i = 0; i < numThreads; ++i) {
+            nbodyThreads.emplace_back(Benchmark::nBodyBenchmark, bodies, steps);
+        }
+        for (auto& thread : nbodyThreads) {
+            thread.join();
+        }
+    });
     double nbodyOps = bodies * bodies * steps;
-    std::cout << "NBody benchmark completed in " << elapsedNbody.count() << " seconds.\n";
-    scores["NBody"].push_back(getScore(elapsedNbody.count(), nbodyOps));
+    std::cout << "NBody benchmark completed in " << elapsedNbody << " seconds.\n";
+    scores["NBody"].push_back(getScore(elapsedNbody, nbodyOps));
 
 
     // Return total duration
-    double totalTime = elapsedFloat.count() + elapsedInt.count() + elapsedMatrix.count() + elapsedBranch.count() + elapsedNbody.count();
+    double totalTime = elapsedFloat + elapsedInt + elapsedMatrix + elapsedBranch + elapsedNbody;
     std::cout << "Total multi-threaded benchmark time: " << totalTime << " seconds.\n";
     scores["Combined"].push_back(getScore(totalTime, iterationsPerThread));
 
@@ -207,58 +206,38 @@ std::unordered_map<std::string, std::vector<double>> Benchmark::runSingleThreade
 
     dryRun();
 
-    auto startFloat = std::chrono::high_resolution_clock::now();
-    Benchmark::floatingPointBenchmark(iterations);
+    //Floating-point benchmark
+    double elapsedFloat = Benchmark::time(Benchmark::floatingPointBenchmark, iterations);
+    std::cout << "Floating-point benchmark completed in " << elapsedFloat << " seconds.\n";
 
-    auto endFloat = std::chrono::high_resolution_clock::now();
-    std::chrono::duration<double> elapsedFloat = endFloat - startFloat;
-    std::cout << "Floating-point benchmark completed in " << elapsedFloat.count() << " seconds.\n";
+    scores["Floating-point"].push_back(getScore(elapsedFloat, iterations));
 
-    scores["Floating-point"].push_back(getScore(elapsedFloat.count(), iterations));
+    //Integer arithmetic benchmark
+    double elapsedInt = Benchmark::time(Benchmark::integerArithmeticBenchmark, iterations);
+    std::cout << "Integer arithmetic benchmark completed in " << elapsedInt << " seconds.\n";
+    scores["Integer Arithmetic"].push_back(getScore(elapsedInt, iterations));
 
-    auto startInt = std::chrono::high_resolution_clock::now();
-    Benchmark::integerArithmeticBenchmark(iterations);
-
-    auto endInt = std::chrono::high_resolution_clock::now();
-    std::chrono::duration<double> elapsedInt = endInt - startInt;
-    std::cout << "Integer arithmetic benchmark completed in " << elapsedInt.count() << " seconds.\n";
-
-    scores["Integer Arithmetic"].push_back(getScore(elapsedInt.count(), iterations));
-
+    //Matrix multiply benchmark
     int matrixSize = matrixMultiplySize * std::sqrt(intensityMultiplier);
-    auto startMatrix = std::chrono::high_resolution_clock::now();
-    Benchmark::matrixMultiplyBenchmark(matrixSize);
-
-    auto endMatrix = std::chrono::high_resolution_clock::now();
-    std::chrono::duration<double> elapsedMatrix = endMatrix - startMatrix;
-    std::cout << "Matrix multiply benchmark completed in " << elapsedMatrix.count() << " seconds.\n";
-
+    double elapsedMatrix = Benchmark::time(Benchmark::matrixMultiplyBenchmark, matrixSize);
+    std::cout << "Matrix multiply benchmark completed in " << elapsedMatrix << " seconds.\n";
     int matrixOps = matrixSize * matrixSize; // actual number of operations
-    scores["Matrix Multiply"].push_back(getScore(elapsedMatrix.count(), matrixOps));
+    scores["Matrix Multiply"].push_back(getScore(elapsedMatrix, matrixOps));
 
-    auto startBranch = std::chrono::high_resolution_clock::now();
-    Benchmark::branchPredictionBenchmark(iterations);
-
-    auto endBranch = std::chrono::high_resolution_clock::now();
-    std::chrono::duration<double> elapsedBranch = endBranch - startBranch;
-    std::cout << "Branch prediction benchmark completed in " << elapsedBranch.count() << " seconds.\n";
-
-    scores["Branch Prediction"].push_back(getScore(elapsedBranch.count(), iterations));
+    //Branch prediction benchmark
+    double elapsedBranch = Benchmark::time(Benchmark::branchPredictionBenchmark, iterations);
+    std::cout << "Branch prediction benchmark completed in " << elapsedBranch << " seconds.\n";
+    scores["Branch Prediction"].push_back(getScore(elapsedBranch, iterations));
 
     //NBodies Benchmark
     int steps = 10;
     int bodies = std::sqrt(iterations);
-    auto startNbody = std::chrono::high_resolution_clock::now();
-    Benchmark::nBodyBenchmark(bodies, steps);
-
-    auto endNbody = std::chrono::high_resolution_clock::now();
-    std::chrono::duration<double> elapsedNbody = endNbody - startNbody;
+    double elapsedNbody = Benchmark::time(Benchmark::nBodyBenchmark, bodies, steps);
     double nbodyOps = bodies * bodies * steps;
-    std::cout << "Nbody benchmark completed in " << elapsedNbody.count() << " seconds.\n";
+    std::cout << "Nbody benchmark completed in " << elapsedNbody << " seconds.\n";
+    scores["Nbody"].push_back(getScore(elapsedNbody, nbodyOps));
 
-    scores["Nbody"].push_back(getScore(elapsedNbody.count(), nbodyOps));
-
-    double totalTime = elapsedFloat.count() + elapsedInt.count() + elapsedMatrix.count() + elapsedBranch.count() + elapsedNbody.count();
+    double totalTime = elapsedFloat + elapsedInt + elapsedMatrix + elapsedBranch + elapsedNbody;
     std::cout << "Total single-threaded benchmark time: " << totalTime << " seconds.\n";
     
     scores["Combined"].push_back(getScore(totalTime, iterations));
