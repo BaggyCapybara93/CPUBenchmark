@@ -94,10 +94,11 @@ std::unordered_map<std::string, std::vector<double>> Benchmark::runMultithreaded
     }
 
     auto endMatrix = std::chrono::high_resolution_clock::now();
+    int matrixOps = matrixSize * matrixSize * numThreads; // actual number of operations
     std::chrono::duration<double> elapsedMatrix = endMatrix - startMatrix;
     std::cout << "Matrix multiply benchmark completed in " << elapsedMatrix.count() << " seconds.\n";
 
-    scores["Matrix Multiply"].push_back(getScore(elapsedMatrix.count(), iterationsPerThread));
+    scores["Matrix Multiply"].push_back(getScore(elapsedMatrix.count(), matrixOps));
 
     //Branch Prediction Benchmark
     auto startBranch = std::chrono::high_resolution_clock::now();
@@ -157,7 +158,7 @@ std::unordered_map<std::string, std::vector<double>> Benchmark::runSingleThreade
     std::cout << "Matrix multiply benchmark completed in " << elapsedMatrix.count() << " seconds.\n";
 
     int matrixOps = matrixSize * matrixSize; // actual number of operations
-    scores["Matrix Multiply"].push_back(getScore(elapsedMatrix.count(), iterations));
+    scores["Matrix Multiply"].push_back(getScore(elapsedMatrix.count(), matrixOps));
 
     auto startBranch = std::chrono::high_resolution_clock::now();
     Benchmark::branchPredictionBenchmark(iterations);
