@@ -11,7 +11,7 @@ void ParseArguments::parse(int argc, char* argv[]){
     std::vector<std::string> args(argv + 1, argv + argc);
     
     if(args.empty()){
-        _mode = CommandMode::Invalid;
+        _mode = CommandMode::RunBoth;
         return;
     }
 

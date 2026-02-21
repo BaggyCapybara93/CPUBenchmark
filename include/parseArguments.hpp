@@ -6,7 +6,8 @@
 enum class CommandMode{
     Invalid, 
     RunMultiThreaded,
-    RunSingleThreaded
+    RunSingleThreaded,
+    RunBoth
 };
 
 class ParseArguments{

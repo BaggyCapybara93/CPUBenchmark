@@ -31,7 +31,7 @@ int main(int argc, char* argv[]){
             if(args.shouldSaveResults()){
                 br.saveBenchmark();
             }
-            return 1;
+            return 0;
         }
         case CommandMode::RunMultiThreaded:{
             for(size_t i = 0; i < args.getRepeatCount(); i++){
@@ -52,10 +52,62 @@ int main(int argc, char* argv[]){
                 br.saveBenchmark();
             }
 
-            return 1;
+            return 0;
         }
 
         case CommandMode::Invalid:{
+            return 1;
+        }
+
+        case CommandMode::RunBoth: {
+
+            //Single threaded
+            BenchmarkReport singleReport("./scores_singlethreaded");
+        
+            for (size_t i = 0; i < args.getRepeatCount(); i++) {
+                auto singleScore = benchmark.runSingleThreadedBenchmark(
+                    args.getIterations(),
+                    args.getIntensityMultiplier(),
+                    args.getMatrixMultiplySize()
+                );
+                singleReport.addScore(singleScore);
+            }
+        
+            std::cout << "\n=== Single-Threaded Results ===\n";
+            for (const auto& score : singleReport.getBenchmarkScores()) {
+                double sum = 0.0;
+                for (double val : score.second) sum += val;
+                double avg = score.second.empty() ? 0.0 : sum / score.second.size();
+                std::cout << score.first << " (avg): " << avg << std::endl;
+            }
+        
+        
+            // Mutithreaded
+            BenchmarkReport multiReport("./scores_multithreaded");
+        
+            for (size_t i = 0; i < args.getRepeatCount(); i++) {
+                auto multiScore = benchmark.runMultithreadedBenchmark(
+                    args.getThreadCount(),
+                    args.getIterations(),
+                    args.getIntensityMultiplier(),
+                    args.getMatrixMultiplySize()
+                );
+                multiReport.addScore(multiScore);
+            }
+        
+            std::cout << "\n=== Multi-Threaded Results ===\n";
+            for (const auto& score : multiReport.getBenchmarkScores()) {
+                double sum = 0.0;
+                for (double val : score.second) sum += val;
+                double avg = score.second.empty() ? 0.0 : sum / score.second.size();
+                std::cout << score.first << " (avg): " << avg << std::endl;
+            }
+        
+            if (args.shouldSaveResults()) {
+                singleReport.saveBenchmark();
+                multiReport.saveBenchmark();
+            }
+        
             return 0;
         }
 
