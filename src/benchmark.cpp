@@ -102,6 +102,16 @@ void Benchmark::nBodyBenchmark(int nBodies, int steps) {
     }
 }
 
+void Benchmark::sortingBenchmark(int size){
+    std::vector<int> data(size);
+
+    for(int i = 0; i < size; ++i){
+        data[i] = size - 1;
+    }
+
+    std::sort(data.begin(), data.end());
+}
+
 void Benchmark::dryRun(int iterations = 1000){
     floatingPointBenchmark(iterations);
     integerArithmeticBenchmark(iterations);
@@ -190,6 +200,20 @@ std::unordered_map<std::string, std::vector<double>> Benchmark::runMultithreaded
     std::cout << "NBody benchmark completed in " << elapsedNbody << " seconds.\n";
     scores["NBody"].push_back(getScore(elapsedNbody, nbodyOps));
 
+    //Sorting Benchmark
+    int sortSize = 50000 * std::sqrt(intensityMultiplier);
+    double elapsedSort = Benchmark::time([&]() {
+        std::vector<std::thread> sortThreads;
+        for (int i = 0; i < numThreads; ++i) {
+            sortThreads.emplace_back(Benchmark::sortingBenchmark, iterationsPerThread);
+        }
+        for (auto& thread : sortThreads) {
+            thread.join();
+        }
+    });
+    long long sortOps = 1LL * sortSize * std::log2(sortSize);
+    std::cout << "Sorting benchmark completed in " << elapsedSort << " seconds.\n";
+    scores["Sorting"].push_back(getScore(elapsedSort, sortOps));
 
     // Return total duration
     double totalTime = elapsedFloat + elapsedInt + elapsedMatrix + elapsedBranch + elapsedNbody;
@@ -236,6 +260,13 @@ std::unordered_map<std::string, std::vector<double>> Benchmark::runSingleThreade
     double nbodyOps = bodies * bodies * steps;
     std::cout << "Nbody benchmark completed in " << elapsedNbody << " seconds.\n";
     scores["Nbody"].push_back(getScore(elapsedNbody, nbodyOps));
+    
+    //Sorting benchmark 
+    int sortSize = 50000 * std::sqrt(intensityMultiplier);
+    double elapsedSort = Benchmark::time(Benchmark::sortingBenchmark,sortSize);
+    long long sortOps = 1LL * sortSize * std::log2(sortSize);
+    std::cout << "Sorting benchmark completed in " << elapsedSort << " seconds.\n";
+    scores["Sorting"].push_back(getScore(elapsedSort, sortOps));
 
     double totalTime = elapsedFloat + elapsedInt + elapsedMatrix + elapsedBranch + elapsedNbody;
     std::cout << "Total single-threaded benchmark time: " << totalTime << " seconds.\n";
@@ -243,28 +274,6 @@ std::unordered_map<std::string, std::vector<double>> Benchmark::runSingleThreade
     scores["Combined"].push_back(getScore(totalTime, iterations));
 
     return scores;
-}
-
-
-//Memory Benchmarks
-void Benchmark::runMemoryBandwidthTest(size_t size) {
-    std::vector<int> data(size, 1);  // Allocate memory
-
-    auto start = std::chrono::high_resolution_clock::now();
-
-    // Sequential read/write test
-    for (size_t i = 0; i < size; ++i) {
-        data[i] += 1;
-    }
-
-    auto end = std::chrono::high_resolution_clock::now();
-    std::chrono::duration<double> elapsed = end - start;
-
-    double bandwidth = (size * sizeof(int)) / (elapsed.count() * 1024 * 1024); // MB/s
-
-    std::cout << "Memory Bandwidth Test Completed\n";
-    std::cout << "Elapsed Time: " << elapsed.count() << " seconds\n";
-    std::cout << "Approximate Bandwidth: " << bandwidth << " MB/s\n";
 }
 
 //Score Calculator
