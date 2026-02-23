@@ -118,9 +118,9 @@ void Benchmark::dryRun(int iterations = 1000){
     branchPredictionBenchmark(iterations);
 }
 
-std::unordered_map<std::string, std::vector<double>> Benchmark::runMultithreadedBenchmark(int numThreads, int iterationsPerThread, const int intensityMultiplier, const int matrixMultiplySize) {
+std::vector<Score>  Benchmark::runMultithreadedBenchmark(int numThreads, int iterationsPerThread, const int intensityMultiplier, const int matrixMultiplySize) {
+    Scorer scorer;
     iterationsPerThread *= intensityMultiplier;
-    std::unordered_map<std::string, std::vector<double>> scores;
 
     dryRun();
 
@@ -136,7 +136,7 @@ std::unordered_map<std::string, std::vector<double>> Benchmark::runMultithreaded
     });
 
     std::cout << "Floating-point benchmark completed in " << elapsedFloat << " seconds.\n";
-    scores["Floating-point"].push_back(getScore(elapsedFloat, iterationsPerThread));
+    scorer.addScore("FloatingPoint", elapsedFloat, elapsedFloat);
 
     // Run integer arithmetic benchmark after floating-point benchmark
     double elapsedInt = Benchmark::time([&]() {
@@ -149,7 +149,7 @@ std::unordered_map<std::string, std::vector<double>> Benchmark::runMultithreaded
         }
     });
     std::cout << "Integer arithmetic benchmark completed in " << elapsedInt << " seconds.\n";
-    scores["Integer Arithmetic"].push_back(getScore(elapsedInt, iterationsPerThread));
+    scorer.addScore("Integer", elapsedInt, elapsedInt);
 
     //Matrix Multiplication Benchmark
     int matrixSize = matrixMultiplySize * std::sqrt(intensityMultiplier);
@@ -166,8 +166,7 @@ std::unordered_map<std::string, std::vector<double>> Benchmark::runMultithreaded
     auto endMatrix = std::chrono::high_resolution_clock::now();
     int matrixOps = matrixSize * matrixSize * numThreads; // actual number of operations
     std::cout << "Matrix multiply benchmark completed in " << elapsedMatrix << " seconds.\n";
-
-    scores["Matrix Multiply"].push_back(getScore(elapsedMatrix, matrixOps));
+    scorer.addScore("MatrixMultiply", matrixOps, elapsedMatrix);
 
     //Branch Prediction Benchmark
     double elapsedBranch = Benchmark::time([&]() {
@@ -181,7 +180,7 @@ std::unordered_map<std::string, std::vector<double>> Benchmark::runMultithreaded
     });
 
     std::cout << "Branch prediction benchmark completed in " << elapsedBranch << " seconds.\n";
-    scores["Branch Prediction"].push_back(getScore(elapsedBranch, iterationsPerThread));
+    scorer.addScore("Branch", elapsedBranch, elapsedBranch);
 
     //Nbody Benchmark
     int steps = 10;
@@ -198,7 +197,7 @@ std::unordered_map<std::string, std::vector<double>> Benchmark::runMultithreaded
     });
     double nbodyOps = bodies * bodies * steps;
     std::cout << "NBody benchmark completed in " << elapsedNbody << " seconds.\n";
-    scores["NBody"].push_back(getScore(elapsedNbody, nbodyOps));
+    scorer.addScore("NBody", nbodyOps, elapsedNbody);
 
     //Sorting Benchmark
     int sortSize = 50000 * std::sqrt(intensityMultiplier);
@@ -213,45 +212,43 @@ std::unordered_map<std::string, std::vector<double>> Benchmark::runMultithreaded
     });
     long long sortOps = 1LL * sortSize * std::log2(sortSize);
     std::cout << "Sorting benchmark completed in " << elapsedSort << " seconds.\n";
-    scores["Sorting"].push_back(getScore(elapsedSort, sortOps));
+    scorer.addScore("Sorting", sortOps, elapsedSort);
 
     // Return total duration
     double totalTime = elapsedFloat + elapsedInt + elapsedMatrix + elapsedBranch + elapsedNbody;
     std::cout << "Total multi-threaded benchmark time: " << totalTime << " seconds.\n";
-    scores["Combined"].push_back(getScore(totalTime, iterationsPerThread));
 
-    return scores;
+    return scorer.getScores();
 }
 
 
-std::unordered_map<std::string, std::vector<double>> Benchmark::runSingleThreadedBenchmark(int iterations, const int intensityMultiplier, const int matrixMultiplySize){
+std::vector<Score> Benchmark::runSingleThreadedBenchmark(int iterations, const int intensityMultiplier, const int matrixMultiplySize){
+    Scorer scorer;
     iterations *= intensityMultiplier;
-    std::unordered_map<std::string, std::vector<double>> scores;
 
     dryRun();
 
     //Floating-point benchmark
     double elapsedFloat = Benchmark::time(Benchmark::floatingPointBenchmark, iterations);
     std::cout << "Floating-point benchmark completed in " << elapsedFloat << " seconds.\n";
-
-    scores["Floating-point"].push_back(getScore(elapsedFloat, iterations));
+    scorer.addScore("FloatingPoint", elapsedFloat, elapsedFloat);
 
     //Integer arithmetic benchmark
     double elapsedInt = Benchmark::time(Benchmark::integerArithmeticBenchmark, iterations);
     std::cout << "Integer arithmetic benchmark completed in " << elapsedInt << " seconds.\n";
-    scores["Integer Arithmetic"].push_back(getScore(elapsedInt, iterations));
+    scorer.addScore("Integer", elapsedInt, elapsedInt);
 
     //Matrix multiply benchmark
     int matrixSize = matrixMultiplySize * std::sqrt(intensityMultiplier);
     double elapsedMatrix = Benchmark::time(Benchmark::matrixMultiplyBenchmark, matrixSize);
     std::cout << "Matrix multiply benchmark completed in " << elapsedMatrix << " seconds.\n";
     int matrixOps = matrixSize * matrixSize; // actual number of operations
-    scores["Matrix Multiply"].push_back(getScore(elapsedMatrix, matrixOps));
+    scorer.addScore("MatrixMultiply", matrixOps, elapsedMatrix);
 
     //Branch prediction benchmark
     double elapsedBranch = Benchmark::time(Benchmark::branchPredictionBenchmark, iterations);
     std::cout << "Branch prediction benchmark completed in " << elapsedBranch << " seconds.\n";
-    scores["Branch Prediction"].push_back(getScore(elapsedBranch, iterations));
+    scorer.addScore("Branch", elapsedBranch, elapsedBranch);
 
     //NBodies Benchmark
     int steps = 10;
@@ -259,28 +256,17 @@ std::unordered_map<std::string, std::vector<double>> Benchmark::runSingleThreade
     double elapsedNbody = Benchmark::time(Benchmark::nBodyBenchmark, bodies, steps);
     double nbodyOps = bodies * bodies * steps;
     std::cout << "Nbody benchmark completed in " << elapsedNbody << " seconds.\n";
-    scores["Nbody"].push_back(getScore(elapsedNbody, nbodyOps));
+    scorer.addScore("NBody", nbodyOps, elapsedNbody);
     
     //Sorting benchmark 
     int sortSize = 50000 * std::sqrt(intensityMultiplier);
     double elapsedSort = Benchmark::time(Benchmark::sortingBenchmark,sortSize);
     long long sortOps = 1LL * sortSize * std::log2(sortSize);
     std::cout << "Sorting benchmark completed in " << elapsedSort << " seconds.\n";
-    scores["Sorting"].push_back(getScore(elapsedSort, sortOps));
+    scorer.addScore("Sorting", sortOps, elapsedSort);
 
     double totalTime = elapsedFloat + elapsedInt + elapsedMatrix + elapsedBranch + elapsedNbody;
     std::cout << "Total single-threaded benchmark time: " << totalTime << " seconds.\n";
-    
-    scores["Combined"].push_back(getScore(totalTime, iterations));
 
-    return scores;
-}
-
-//Score Calculator
-double Benchmark::getScore(double intake, int iterations) {
-    constexpr double referenceTime = 1.0; // seconds for baseline run
-    constexpr int referenceIterations = 1000000;
-
-    double score = (iterations / intake) / (referenceIterations / referenceTime);
-    return score * 1000.0; // scaled nicely
+    return scorer.getScores();
 }

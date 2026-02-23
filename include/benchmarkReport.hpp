@@ -1,5 +1,5 @@
 #pragma once
-
+#include "scorer.hpp"
 #include <string>
 #include <fstream>
 #include <chrono>
@@ -12,7 +12,7 @@
 class BenchmarkReport{
     private:
         std::string saveFolder_;
-        std::unordered_map<std::string, std::vector<double>> benchmarkScores_; //Benchmark Type -> scores
+        std::vector<Score>  benchmarkScores_;
 
         //Timestamp generation
         std::string getTimestampedFile(const std::string& baseName, const std::string& extension) const {
@@ -33,16 +33,14 @@ class BenchmarkReport{
 
         //Getters
         const std::string& getSaveFolder() const;
-        const std::unordered_map<std::string, std::vector<double>>& getBenchmarkScores() const;
+        const std::vector<Score>& getBenchmarkScores() const;
+        double getCombinedScore() const;
 
         //Setters
         void setSaveFolder(const std::string& newSaveFolder);
 
         //Add score
-        void addScore(std::unordered_map<std::string, std::vector<double>>& benchmarks);
-
-        //Remove score
-            //To be implemented 
+        void addScore(const std::vector<Score>& benchmarks);
 
         //Save benchmark
         void saveBenchmark();

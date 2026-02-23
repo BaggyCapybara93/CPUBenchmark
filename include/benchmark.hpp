@@ -1,5 +1,5 @@
 #pragma once
-
+#include "scorer.hpp"
 #include <chrono>
 #include <cmath>
 #include <iostream>
@@ -16,8 +16,8 @@ public:
     static void nBodyBenchmark(int nBodies, int steps);
     static void sortingBenchmark(int size);
     static void dryRun(int iterations);
-    static std::unordered_map<std::string, std::vector<double>> runMultithreadedBenchmark(int numThreads, int iterationsPerThread, const int intensityMultiplier = 50, const int matrixMultiplySize = 128);
-    static std::unordered_map<std::string, std::vector<double>> runSingleThreadedBenchmark(int iterations, const int intensityMultiplier = 50, const int matrixMultiplySize = 128);
+    static std::vector<Score> runMultithreadedBenchmark(int numThreads, int iterationsPerThread, const int intensityMultiplier = 50, const int matrixMultiplySize = 128);
+    static std::vector<Score> runSingleThreadedBenchmark(int iterations, const int intensityMultiplier = 50, const int matrixMultiplySize = 128);
 
     //Memory Benchmarks
     static void runMemoryBandwidthTest(size_t size);
