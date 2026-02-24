@@ -28,10 +28,18 @@ void Benchmark::integerArithmeticBenchmark(int iterations){
 }
 
 void Benchmark::matrixMultiplyBenchmark(int size) {
-    std::vector<std::vector<double>> matrix(size, std::vector<double>(size, 1.0));
-    for (int i = 0; i < size; ++i)
-        for (int j = 0; j < size; ++j)
-            matrix[i][j] *= std::sin(i) * std::cos(j);
+    std::vector<double> A(size * size, 1.0);
+    std::vector<double> B(size * size, 1.0);
+    std::vector<double> C(size * size, 0.0);
+
+    for (int i = 0; i < size; ++i) {
+        for (int k = 0; k < size; ++k) {
+            double aik = A[i * size + k];
+            for (int j = 0; j < size; ++j) {
+                C[i * size + j] += aik * B[k * size + j];
+            }
+        }
+    }
 }
 
 void Benchmark::branchPredictionBenchmark(int iterations){
