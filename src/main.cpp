@@ -8,7 +8,7 @@ int main(int argc, char* argv[]) {
     Benchmark benchmark;
 
     switch (args.getMode()) {
-        case CommandMode::RunSingleThreaded: {
+        case Mode::SingleThreaded: {
             BenchmarkReport report("./scores_singlethreaded");
 
             for (size_t i = 0; i < args.getRepeatCount(); i++) {
@@ -34,7 +34,7 @@ int main(int argc, char* argv[]) {
 
             return 0;
         }
-        case CommandMode::RunMultiThreaded: {
+        case Mode::MultiThreaded: {
             BenchmarkReport report("./scores_multithreaded");
 
             for (size_t i = 0; i < args.getRepeatCount(); i++) {
@@ -63,7 +63,7 @@ int main(int argc, char* argv[]) {
 
             return 0;
         }
-        case CommandMode::RunBoth: {
+        case Mode::Both: {
 
             // --- Single-threaded ---
             BenchmarkReport singleReport("./scores");
@@ -121,7 +121,7 @@ int main(int argc, char* argv[]) {
             return 0;
         }
 
-        case CommandMode::Invalid:
+        case Mode::Invalid:
             return 1;
     }
 

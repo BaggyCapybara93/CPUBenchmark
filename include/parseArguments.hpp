@@ -3,16 +3,30 @@
 #include <string>
 #include <thread>
 
-enum class CommandMode{
-    Invalid, 
-    RunMultiThreaded,
-    RunSingleThreaded,
-    RunBoth
+enum class Mode{
+    SingleThreaded,
+    MultiThreaded,
+    Both,
+    Invalid
+};
+
+enum class ArgType{
+    Help,
+    Threads,
+    Iterations,
+    IntensityMultiplier,
+    MatrixMultiplySize,
+    Repeat,
+    SingleThreaded,
+    MultiThreaded,
+    Both,
+    Invalid
 };
 
 class ParseArguments{
     private:
-        CommandMode _mode = CommandMode::Invalid;
+        ArgType _argtype = ArgType::Invalid;
+        Mode _mode = Mode::Invalid;
         bool _saveResults = true;
         int _threadCount = std::thread::hardware_concurrency();
         int _iterations = 999999;
@@ -26,7 +40,7 @@ class ParseArguments{
         ParseArguments(int argc, char* argv[]);
 
         //Getters
-        CommandMode getMode() const;
+        Mode getMode() const;
         int getThreadCount() const;
         int getIterations() const;
         int getRepeatCount() const;
