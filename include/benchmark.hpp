@@ -19,9 +19,6 @@ public:
     static std::vector<Score> runMultithreadedBenchmark(int numThreads, int iterationsPerThread, const int intensityMultiplier = 50, const int matrixMultiplySize = 128);
     static std::vector<Score> runSingleThreadedBenchmark(int iterations, const int intensityMultiplier = 50, const int matrixMultiplySize = 128);
 
-    //Memory Benchmarks
-    static void runMemoryBandwidthTest(size_t size);
-
     //Score calculator
     static double getScore(double intake, int iterations);
 
