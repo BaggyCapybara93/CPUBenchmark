@@ -1,6 +1,7 @@
 #include "benchmark.hpp"
 #include "parseArguments.hpp"
 #include "benchmarkReport.hpp"
+#include "benchmarkCoordinator.hpp"
 #include <iostream>
 
 int main(int argc, char* argv[]) {
@@ -9,121 +10,81 @@ int main(int argc, char* argv[]) {
 
     switch (args.getMode()) {
         case Mode::SingleThreaded: {
-            BenchmarkReport report("./scores_singlethreaded");
-
-            for (size_t i = 0; i < args.getRepeatCount(); i++) {
-                const auto& results = benchmark.runSingleThreadedBenchmark(
-                    args.getIterations(),
-                    args.getIntensityMultiplier(),
-                    args.getMatrixMultiplySize()
-                );
-
-                report.addScore(results);
-            }
-
-            // Print results
-            std::cout << "\n=== Single-Threaded Results ===\n";
-            for (const auto& s : report.getBenchmarkScores()) {
-                std::cout << s.benchmarkName
-                          << " | Score: " << s.score
-                          << " | Time: " << s.time << "s\n";
-            }
-
-            if (args.shouldSaveResults())
-                report.saveBenchmark();
-
+            BenchmarkReport singleReport("./scores_singlethreaded");
+            // Initialize and run the coordinator
+            BenchmarkCoordinator coordinator(args, benchmark, singleReport);
+            
+            // Run the coordinator with the single-threaded runner
+            coordinator.runMode(
+                [](const ParseArguments& a, Benchmark& b) {
+                    return b.runSingleThreadedBenchmark(
+                        a.getIterations(),
+                        a.getIntensityMultiplier(),
+                        a.getMatrixMultiplySize()
+                    );
+                }
+            );
             return 0;
         }
         case Mode::MultiThreaded: {
-            BenchmarkReport report("./scores_multithreaded");
+            BenchmarkReport multiReport("./scores_multithreaded");
+            BenchmarkCoordinator coordinator(args, benchmark, multiReport);
 
-            for (size_t i = 0; i < args.getRepeatCount(); i++) {
-                const auto& results = benchmark.runMultithreadedBenchmark(
-                    args.getThreadCount(),
-                    args.getIterations(),
-                    args.getIntensityMultiplier(),
-                    args.getMatrixMultiplySize()
-                );
-
-                report.addScore(results);
-            }
-
-            std::cout << "\n=== Multi-Threaded Results ===\n";
-            for (const auto& s : report.getBenchmarkScores()) {
-                std::cout << s.benchmarkName
-                          << " | Score: " << s.score
-                          << " | Time: " << s.time << "s\n";
-            }
-            std::cout << "Combined Score: "
-                << report.getCombinedScore()
-                << "\n";
-
-            if (args.shouldSaveResults())
-                report.saveBenchmark();
-
+            // Run the coordinator with the multi-threaded runner
+            coordinator.runMode(
+                [](const ParseArguments& a, Benchmark& b) {
+                    return b.runMultithreadedBenchmark(
+                        a.getThreadCount(),
+                        a.getIterations(),
+                        a.getIntensityMultiplier(),
+                        a.getMatrixMultiplySize()
+                    );
+                }
+            );
             return 0;
         }
+
         case Mode::Both: {
+            std::cout << "==========================================\n";
+            std::cout << "Starting Single-Threaded Benchmark...\n";
+            
+            BenchmarkReport singleReport("./scores_singlethreaded");
+            BenchmarkCoordinator singleCoordinator(args, benchmark, singleReport);
 
-            // --- Single-threaded ---
-            BenchmarkReport singleReport("./scores");
-
-            for (size_t i = 0; i < args.getRepeatCount(); i++) {
-                const auto& results = benchmark.runSingleThreadedBenchmark(
-                    args.getIterations(),
-                    args.getIntensityMultiplier(),
-                    args.getMatrixMultiplySize()
+            auto singleRunner = [](const ParseArguments& a, Benchmark& b) {
+                return b.runSingleThreadedBenchmark(
+                    a.getIterations(),
+                    a.getIntensityMultiplier(),
+                    a.getMatrixMultiplySize()
                 );
+            };
+            
+            singleCoordinator.runMode(singleRunner);
 
-                singleReport.addScore(results);
-            }
 
-            std::cout << "\n=== Single-Threaded Results ===\n";
-            for (const auto& s : singleReport.getBenchmarkScores()) {
-                std::cout << s.benchmarkName
-                          << " | Score: " << s.score
-                          << " | Time: " << s.time << "s\n";
-            }
-            std::cout << "Combined Score: "
-                << singleReport.getCombinedScore()
-                << "\n";
+            std::cout << "\n\n==========================================\n";
+            std::cout << "Starting Multi-Threaded Benchmark...\n";
 
-            // --- Multi-threaded ---
-            BenchmarkReport multiReport("./scores");
+            BenchmarkReport multiReport("./scores_multithreaded");
+            BenchmarkCoordinator multiCoordinator(args, benchmark, multiReport);
 
-            for (size_t i = 0; i < args.getRepeatCount(); i++) {
-                const auto& results = benchmark.runMultithreadedBenchmark(
-                    args.getThreadCount(),
-                    args.getIterations(),
-                    args.getIntensityMultiplier(),
-                    args.getMatrixMultiplySize()
+            auto multiRunner = [](const ParseArguments& a, Benchmark& b) {
+                return b.runMultithreadedBenchmark(
+                    a.getThreadCount(),
+                    a.getIterations(),
+                    a.getIntensityMultiplier(),
+                    a.getMatrixMultiplySize()
                 );
-
-                multiReport.addScore(results);
-            }
-
-            std::cout << "\n=== Multi-Threaded Results ===\n";
-            for (const auto& s : multiReport.getBenchmarkScores()) {
-                std::cout << s.benchmarkName
-                          << " | Score: " << s.score
-                          << " | Time: " << s.time << "s\n";
-            }
-
-            std::cout << "Combined Score: "
-                << multiReport.getCombinedScore()
-                << "\n";
-
-            if (args.shouldSaveResults()) {
-                singleReport.saveBenchmark();
-                multiReport.saveBenchmark();
-            }
-
+            };
+            
+            multiCoordinator.runMode(multiRunner);
+            
             return 0;
         }
 
-        case Mode::Invalid:
+        case Mode::Invalid:{
+            std::cout << "Invalid benchmarking mode. Exiting...\n";
             return 1;
+        }
     }
-
-    return 0;
 }
