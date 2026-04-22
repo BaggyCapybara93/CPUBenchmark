@@ -16,8 +16,8 @@ public:
     static void nBodyBenchmark(int nBodies, int steps);
     static void sortingBenchmark(int size);
     static void dryRun(int iterations);
-    static std::vector<Score> runMultithreadedBenchmark(int numThreads, int iterationsPerThread, const int intensityMultiplier = 50, const int matrixMultiplySize = 128);
-    static std::vector<Score> runSingleThreadedBenchmark(int iterations, const int intensityMultiplier = 50, const int matrixMultiplySize = 128);
+    static std::vector<Score> runMultithreadedBenchmark(const int numThreads, int iterationsPerThread, const int intensityMultiplier = 50, const int matrixMultiplySize = 128, const int numRuns = 10);
+    static std::vector<Score> runSingleThreadedBenchmark(int iterations, const int intensityMultiplier = 50, const int matrixMultiplySize = 128, const int numRuns = 10);
 
     //Score calculator
     static double getScore(double intake, int iterations);
@@ -25,4 +25,8 @@ public:
     //Time
     template <typename Function, typename... Args>
     static double time(Function&& function, Args&& ... args);
+
+    //Runner
+    template <typename Function, typename... Args>
+    static double runBenchmark(Function func, Args... args, int numRuns);
 };

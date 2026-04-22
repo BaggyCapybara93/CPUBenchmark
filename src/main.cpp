@@ -20,7 +20,8 @@ int main(int argc, char* argv[]) {
                     return b.runSingleThreadedBenchmark(
                         a.getIterations(),
                         a.getIntensityMultiplier(),
-                        a.getMatrixMultiplySize()
+                        a.getMatrixMultiplySize(),
+                        a.getNumRuns()
                     );
                 }
             );
@@ -37,7 +38,8 @@ int main(int argc, char* argv[]) {
                         a.getThreadCount(),
                         a.getIterations(),
                         a.getIntensityMultiplier(),
-                        a.getMatrixMultiplySize()
+                        a.getMatrixMultiplySize(),
+                        a.getNumRuns()
                     );
                 }
             );
@@ -55,7 +57,8 @@ int main(int argc, char* argv[]) {
                 return b.runSingleThreadedBenchmark(
                     a.getIterations(),
                     a.getIntensityMultiplier(),
-                    a.getMatrixMultiplySize()
+                    a.getMatrixMultiplySize(),
+                    a.getNumRuns()
                 );
             };
             
@@ -73,7 +76,8 @@ int main(int argc, char* argv[]) {
                     a.getThreadCount(),
                     a.getIterations(),
                     a.getIntensityMultiplier(),
-                    a.getMatrixMultiplySize()
+                    a.getMatrixMultiplySize(),
+                    a.getNumRuns()
                 );
             };
             

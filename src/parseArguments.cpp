@@ -23,6 +23,8 @@ void ParseArguments::parse(int argc, char* argv[]) {
         {"--mm", ArgType::MatrixMultiplySize},
         {"--repeat", ArgType::Repeat},
         {"--r", ArgType::Repeat},
+        {"--numRuns", ArgType::NumRuns},
+        {"--n", ArgType::NumRuns},
         {"--singleThreaded", ArgType::SingleThreaded},
         {"--st", ArgType::SingleThreaded},
         {"--multiThreaded", ArgType::MultiThreaded},
@@ -107,6 +109,18 @@ void ParseArguments::parse(int argc, char* argv[]) {
                     return;
                 }
                 break;
+            case ArgType::NumRuns:
+                if (i + 1 >= args.size()) {
+                    std::cerr << "Error: --numRuns option requires a value.\n";
+                    return;
+                }
+                try {
+                    _repeatCount = std::stoi(args[++i]);
+                } catch (...) {
+                    std::cerr << "Error parsing numRuns.\n";
+                    return;
+                }
+                break;
             case ArgType::SingleThreaded:
                 _mode = Mode::SingleThreaded;
                 break;
@@ -127,6 +141,7 @@ int ParseArguments::getRepeatCount() const{return _repeatCount;}
 int ParseArguments::getMatrixMultiplySize() const{return _matrixMultiplySize;}
 int ParseArguments::getIntensityMultiplier() const{return _intensityMultiplier;}
 bool ParseArguments::shouldSaveResults() const{return _saveResults;}
+int ParseArguments::getNumRuns() const{return _numRuns;}
         
 //Print
 void ParseArguments::printUsage() const {

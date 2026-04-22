@@ -17,6 +17,7 @@ enum class ArgType{
     IntensityMultiplier,
     MatrixMultiplySize,
     Repeat,
+    NumRuns,
     SingleThreaded,
     MultiThreaded,
     Both,
@@ -33,6 +34,7 @@ class ParseArguments{
         int _repeatCount = 1;
         int _matrixMultiplySize = 128;
         int _intensityMultiplier = 50;
+        int _numRuns = 5;
 
         void parse(int argc, char* argv[]);
     public:
@@ -47,6 +49,7 @@ class ParseArguments{
         int getMatrixMultiplySize() const;
         int getIntensityMultiplier() const;
         bool shouldSaveResults() const;
+        int getNumRuns() const;
         
         //Print
         void printUsage() const;
