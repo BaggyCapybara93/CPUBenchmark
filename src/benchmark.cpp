@@ -75,6 +75,14 @@ void Benchmark::matrixMultiplyBenchmark(int size) {
             }
         }
     }
+
+    double sum = 0.0;
+    for(const auto& value : C){
+        sum += value;
+    }
+
+    //Optimizaiton mitigation
+    volatile double check = sum;
 }
 
 void Benchmark::branchPredictionBenchmark(int iterations){
@@ -142,6 +150,16 @@ void Benchmark::nBodyBenchmark(int nBodies, int steps) {
             bodies[i].y += bodies[i].vy * dt;
             bodies[i].z += bodies[i].vz * dt;
         }
+
+        double totalEnergy = 0.0;
+        for (const auto& body : bodies){
+            double KE = 0.5 * body.mass * (body.vx*body.vx + body.vy*body.vy + body.vz*body.vz);
+            totalEnergy += KE;
+        }
+
+        //Optimization Mitigation
+        volatile double finalEnergy = totalEnergy; 
+
     }
 }
 
