@@ -15,6 +15,11 @@ double Benchmark::time(Function&& function, Args&&... args) {
     return std::chrono::duration<double>(end - start).count();
 }
 
+template <typename Function, typename... Args>
+void Benchmark::execute(Function&& function, Args&& ... args) {
+    std::invoke(std::forward<Function>(function), std::forward<Args>(args)...);
+}
+
 void Benchmark::floatingPointBenchmark(int iterations) {
     volatile double result = 0.0;
     for (int i = 0; i < iterations; ++i) {
@@ -33,7 +38,7 @@ double Benchmark::runBenchmark(Function func, Args... args, int numRuns) {
     //Warmup
     const int warmupRuns = 5;
     for (int i = 0; i < warmupRuns; ++i) {
-        Benchmark::time(func, args...); 
+        Benchmark::execute(func, args...);
     }
 
     // Measurement

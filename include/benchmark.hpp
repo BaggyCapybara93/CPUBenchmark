@@ -29,4 +29,8 @@ public:
     //Runner
     template <typename Function, typename... Args>
     static double runBenchmark(Function func, Args... args, int numRuns);
+
+    //Non-timing Functon Execution
+    template <typename Function, typename... Args>
+    static void execute(Function&& func, Args&&... args);
 };
