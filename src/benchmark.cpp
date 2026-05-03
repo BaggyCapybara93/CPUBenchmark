@@ -28,7 +28,7 @@ void Benchmark::floatingPointBenchmark(int iterations) {
 }
 
 template <typename Function, typename... Args>
-double Benchmark::runBenchmark(Function func, Args... args, int numRuns) {
+double Benchmark::runBenchmark(Function&& func, Args&&... args, int numRuns) {
     if (numRuns <= 0) {
         // Handle this error gracefully, perhaps throwing an exception
         // or returning a specific error code/value.
