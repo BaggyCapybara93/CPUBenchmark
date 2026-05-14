@@ -6,55 +6,6 @@
 #include <functional>
 #include <thread>
 
-//Time
-template <typename Function, typename... Args>
-double Benchmark::time(Function&& function, Args&&... args) {
-    auto start = std::chrono::high_resolution_clock::now();
-    std::invoke(std::forward<Function>(function), std::forward<Args>(args)...);
-    auto end = std::chrono::high_resolution_clock::now();
-    return std::chrono::duration<double>(end - start).count();
-}
-
-template <typename Function, typename... Args>
-void Benchmark::execute(Function&& function, Args&& ... args) {
-    std::invoke(std::forward<Function>(function), std::forward<Args>(args)...);
-}
-
-void Benchmark::floatingPointBenchmark(int iterations) {
-    volatile double result = 0.0;
-    for (int i = 0; i < iterations; ++i) {
-        result += std::sin(i) * std::cos(i) / std::tan(i + 1);
-    }
-}
-
-template <typename Function, typename... Args>
-double Benchmark::runBenchmark(Function&& func, Args&&... args, int numRuns) {
-    if (numRuns <= 0) {
-        // Handle this error gracefully, perhaps throwing an exception
-        // or returning a specific error code/value.
-        throw std::invalid_argument("Number of runs must be positive.");
-    }
-
-    //Warmup
-    const int warmupRuns = 5;
-    for (int i = 0; i < warmupRuns; ++i) {
-        Benchmark::execute(func, args...);
-    }
-
-    // Measurement
-    std::vector<double> runTimes;
-    
-    for (int i = 0; i < numRuns; ++i) {
-        double duration = Benchmark::time(func, args...); 
-        runTimes.push_back(duration);
-    }
-
-    // Calculation
-    double totalTime = std::accumulate(runTimes.begin(), runTimes.end(), 0.0);
-    
-    return totalTime / numRuns; // Returns the average 
-}
-
 void Benchmark::integerArithmeticBenchmark(int iterations){
     volatile int result = 0;
     for(int i = 0; i < iterations; ++i){
