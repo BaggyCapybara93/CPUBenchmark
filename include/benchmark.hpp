@@ -4,6 +4,8 @@
 #include <cmath>
 #include <iostream>
 #include <thread>
+#include <functional>
+#include <numeric>
 #include <vector>
 #include <unordered_map>
 
@@ -62,6 +64,6 @@ public:
     //Non-timing Functon Execution
     template <typename Function, typename... Args>
     static void execute(Function&& func, Args&&... args){
-        std::invoke(std::forward<Function>(function), std::forward<Args>(args)...);
+        std::invoke(std::forward<Function>(func), std::forward<Args>(args)...);
     }   
 };

@@ -2,9 +2,14 @@
 #include <chrono>
 #include <cmath>
 #include <iostream>
-#include <numeric>
-#include <functional>
 #include <thread>
+
+void Benchmark::floatingPointBenchmark(int iterations) {
+    volatile double result = 0.0;
+    for (int i = 0; i < iterations; ++i) {
+        result += std::sin(i) * std::cos(i) / std::tan(i + 1);
+    }
+}
 
 void Benchmark::integerArithmeticBenchmark(int iterations){
     volatile int result = 0;
