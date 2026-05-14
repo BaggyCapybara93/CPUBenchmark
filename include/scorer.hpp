@@ -17,9 +17,9 @@ struct Score {
 
 class Scorer {
 private:
-    std::vector<Score> _scores;
+    std::vector<Score> scores_;
 
-    std::unordered_map<std::string, double> _weights = {
+    std::unordered_map<std::string, double> weights_ = {
         {"FloatingPoint", 0.25},
         {"Branch", 0.10},
         {"Integer",       0.20},
@@ -28,7 +28,7 @@ private:
         {"NBody",         0.15}
     };
 
-    std::unordered_map<std::string, double> _baselineTimes = {
+    std::unordered_map<std::string, double> baselineTimes_ = {
         {"FloatingPoint", 0.020},
         {"Branch", 0.020},
         {"Integer",       0.015},

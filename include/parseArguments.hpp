@@ -26,15 +26,15 @@ enum class ArgType{
 
 class ParseArguments{
     private:
-        ArgType _argtype = ArgType::Invalid;
-        Mode _mode = Mode::Invalid;
-        bool _saveResults = true;
-        int _threadCount = std::thread::hardware_concurrency();
-        int _iterations = 999999;
-        int _repeatCount = 1;
-        int _matrixMultiplySize = 128;
-        int _intensityMultiplier = 50;
-        int _numRuns = 5;
+        ArgType argtype_ = ArgType::Invalid;
+        Mode mode_ = Mode::Invalid;
+        bool saveResults_ = true;
+        int threadCount_ = std::thread::hardware_concurrency();
+        int iterations_ = 999999;
+        int repeatCount_ = 1;
+        int matrixMultiplySize_ = 128;
+        int intensityMultiplier_ = 50;
+        int numRuns_ = 5;
 
         void parse(int argc, char* argv[]);
     public:

@@ -32,7 +32,7 @@ void ParseArguments::parse(int argc, char* argv[]) {
     };
 
     if (args.empty()) {
-        _mode = Mode::Both;
+        mode_ = Mode::Both;
         return;
     }
 
@@ -55,7 +55,7 @@ void ParseArguments::parse(int argc, char* argv[]) {
                     return;
                 }
                 try {
-                    _threadCount = std::stoi(args[++i]);
+                    threadCount_ = std::stoi(args[++i]);
                 } catch (...) {
                     std::cerr << "Error parsing thread count.\n";
                     return;
@@ -67,7 +67,7 @@ void ParseArguments::parse(int argc, char* argv[]) {
                     return;
                 }
                 try {
-                    _iterations = std::stoi(args[++i]);
+                    iterations_ = std::stoi(args[++i]);
                 } catch (...) {
                     std::cerr << "Error parsing iterations.\n";
                     return;
@@ -79,7 +79,7 @@ void ParseArguments::parse(int argc, char* argv[]) {
                     return;
                 }
                 try {
-                    _intensityMultiplier = std::stoi(args[++i]);
+                    intensityMultiplier_ = std::stoi(args[++i]);
                 } catch (...) {
                     std::cerr << "Error parsing intensity multiplier.\n";
                     return;
@@ -91,7 +91,7 @@ void ParseArguments::parse(int argc, char* argv[]) {
                     return;
                 }
                 try {
-                    _matrixMultiplySize = std::stoi(args[++i]);
+                    matrixMultiplySize_ = std::stoi(args[++i]);
                 } catch (...) {
                     std::cerr << "Error parsing matrix multiply size.\n";
                     return;
@@ -103,7 +103,7 @@ void ParseArguments::parse(int argc, char* argv[]) {
                     return;
                 }
                 try {
-                    _repeatCount = std::stoi(args[++i]);
+                    repeatCount_ = std::stoi(args[++i]);
                 } catch (...) {
                     std::cerr << "Error parsing repeat count.\n";
                     return;
@@ -115,17 +115,17 @@ void ParseArguments::parse(int argc, char* argv[]) {
                     return;
                 }
                 try {
-                    _repeatCount = std::stoi(args[++i]);
+                    numRuns_ = std::stoi(args[++i]);
                 } catch (...) {
                     std::cerr << "Error parsing numRuns.\n";
                     return;
                 }
                 break;
             case ArgType::SingleThreaded:
-                _mode = Mode::SingleThreaded;
+                mode_ = Mode::SingleThreaded;
                 break;
             case ArgType::MultiThreaded:
-                _mode = Mode::MultiThreaded;
+                mode_ = Mode::MultiThreaded;
                 break;
             default:
                 break;
@@ -134,14 +134,14 @@ void ParseArguments::parse(int argc, char* argv[]) {
 }
 
 //Getters
-Mode ParseArguments::getMode() const{return _mode;}
-int ParseArguments::getThreadCount() const{return _threadCount;}
-int ParseArguments::getIterations() const{return _iterations;}
-int ParseArguments::getRepeatCount() const{return _repeatCount;}
-int ParseArguments::getMatrixMultiplySize() const{return _matrixMultiplySize;}
-int ParseArguments::getIntensityMultiplier() const{return _intensityMultiplier;}
-bool ParseArguments::shouldSaveResults() const{return _saveResults;}
-int ParseArguments::getNumRuns() const{return _numRuns;}
+Mode ParseArguments::getMode() const{return mode_;}
+int ParseArguments::getThreadCount() const{return threadCount_;}
+int ParseArguments::getIterations() const{return iterations_;}
+int ParseArguments::getRepeatCount() const{return repeatCount_;}
+int ParseArguments::getMatrixMultiplySize() const{return matrixMultiplySize_;}
+int ParseArguments::getIntensityMultiplier() const{return intensityMultiplier_;}
+bool ParseArguments::shouldSaveResults() const{return saveResults_;}
+int ParseArguments::getNumRuns() const{return numRuns_;}
         
 //Print
 void ParseArguments::printUsage() const {
