@@ -2,7 +2,7 @@
 #include <iostream>
 
 void BenchmarkCoordinator::runMode(RunnerFunction runner){
-    for (size_t i = 0; i < args_.getRepeatCount(); i++) {
+    for (size_t i = 0; i < static_cast<size_t>(args_.getRepeatCount()); i++) {
         const auto& results = runner(args_, benchmark_);
         report_.addScore(results);
     }

@@ -19,15 +19,15 @@ void Benchmark::integerArithmeticBenchmark(int iterations){
 }
 
 void Benchmark::matrixMultiplyBenchmark(int size) {
-    std::vector<double> A(size * size, 1.0);
-    std::vector<double> B(size * size, 1.0);
-    std::vector<double> C(size * size, 0.0);
+    std::vector<double> A(static_cast<std::size_t>(size) * static_cast<std::size_t>(size), 1.0);
+    std::vector<double> B(static_cast<std::size_t>(size) * static_cast<std::size_t>(size), 1.0);
+    std::vector<double> C(static_cast<std::size_t>(size) * static_cast<std::size_t>(size), 0.0);
 
-    for (int i = 0; i < size; ++i) {
-        for (int k = 0; k < size; ++k) {
-            double aik = A[i * size + k];
-            for (int j = 0; j < size; ++j) {
-                C[i * size + j] += aik * B[k * size + j];
+    for (std::size_t i = 0; i < static_cast<std::size_t>(size); ++i) {
+        for (std::size_t k = 0; k < static_cast<std::size_t>(size); ++k) {
+            double aik = A[i * static_cast<std::size_t>(size) + k];
+            for (std::size_t j = 0; j < static_cast<std::size_t>(size); ++j) {
+                C[i * static_cast<std::size_t>(size) + j] += aik * B[k * static_cast<std::size_t>(size) + j];
             }
         }
     }
@@ -38,7 +38,7 @@ void Benchmark::matrixMultiplyBenchmark(int size) {
     }
 
     //Optimizaiton mitigation
-    volatile double check = sum;
+    volatile double _ = sum;
 }
 
 void Benchmark::branchPredictionBenchmark(int iterations){
@@ -60,13 +60,13 @@ void Benchmark::nBodyBenchmark(int nBodies, int steps) {
         double mass;
     };
 
-    std::vector<Body> bodies(nBodies);
+    std::vector<Body> bodies(static_cast<std::size_t>(nBodies));
 
     // Initialize bodies with deterministic values
-    for (int i = 0; i < nBodies; ++i) {
-        bodies[i].x = i * 0.01;
-        bodies[i].y = i * 0.02;
-        bodies[i].z = i * 0.03;
+    for (std::size_t i = 0; i < static_cast<std::size_t>(nBodies); ++i) {
+        bodies[i].x = static_cast<double>(i) * 0.01;
+        bodies[i].y = static_cast<double>(i) * 0.02;
+        bodies[i].z = static_cast<double>(i) * 0.03;
         bodies[i].vx = bodies[i].vy = bodies[i].vz = 0.0;
         bodies[i].mass = 1.0;
     }
@@ -75,10 +75,10 @@ void Benchmark::nBodyBenchmark(int nBodies, int steps) {
     const double dt = 0.01;
 
     for (int step = 0; step < steps; ++step) {
-        for (int i = 0; i < nBodies; ++i) {
+        for (std::size_t i = 0; i < static_cast<std::size_t>(nBodies); ++i) {
             double ax = 0.0, ay = 0.0, az = 0.0;
 
-            for (int j = 0; j < nBodies; ++j) {
+            for (std::size_t j = 0; j < static_cast<std::size_t>(nBodies); ++j) {
                 if (i == j) continue;
 
                 double dx = bodies[j].x - bodies[i].x;
@@ -101,7 +101,7 @@ void Benchmark::nBodyBenchmark(int nBodies, int steps) {
             bodies[i].vz += az * dt;
         }
 
-        for (int i = 0; i < nBodies; ++i) {
+        for (std::size_t i = 0; i < static_cast<std::size_t>(nBodies); ++i) {
             bodies[i].x += bodies[i].vx * dt;
             bodies[i].y += bodies[i].vy * dt;
             bodies[i].z += bodies[i].vz * dt;
@@ -114,15 +114,15 @@ void Benchmark::nBodyBenchmark(int nBodies, int steps) {
         }
 
         //Optimization Mitigation
-        volatile double finalEnergy = totalEnergy; 
+        volatile double _ = totalEnergy; 
 
     }
 }
 
 void Benchmark::sortingBenchmark(int size){
-    std::vector<int> data(size);
+    std::vector<int> data(static_cast<std::size_t>(size));
 
-    for(int i = 0; i < size; ++i){
+    for(std::size_t i = 0; i < static_cast<std::size_t>(size); ++i){
         data[i] = size - 1;
     }
 
@@ -170,7 +170,7 @@ std::vector<Score>  Benchmark::runMultithreadedBenchmark(const int numThreads, i
     scorer.addScore("Integer", elapsedInt, elapsedInt);
 
     //Matrix Multiplication Benchmark
-    int matrixSize = matrixMultiplySize * std::sqrt(intensityMultiplier);
+    int matrixSize = static_cast<int>(matrixMultiplySize * std::sqrt(static_cast<double>(intensityMultiplier)));
     auto matrixRunner = [&]() {
         std::vector<std::thread> matrixThreads;
         for (int i = 0; i < numThreads; ++i) {
@@ -182,7 +182,6 @@ std::vector<Score>  Benchmark::runMultithreadedBenchmark(const int numThreads, i
     };
 
     double elapsedMatrix = Benchmark::runBenchmark(matrixRunner, numRuns);
-    auto endMatrix = std::chrono::high_resolution_clock::now();
     int matrixOps = matrixSize * matrixSize * numThreads; // actual number of operations
     std::cout << "Matrix multiply benchmark completed in " << elapsedMatrix << " seconds.\n";
     scorer.addScore("MatrixMultiply", matrixOps, elapsedMatrix);
@@ -204,7 +203,7 @@ std::vector<Score>  Benchmark::runMultithreadedBenchmark(const int numThreads, i
 
     //Nbody Benchmark
     int steps = 10;
-    int bodies = std::sqrt(iterationsPerThread);
+    int bodies = static_cast<int>(std::sqrt(iterationsPerThread));
 
     auto nbodyRunner = [&]() {
         std::vector<std::thread> nbodyThreads;
@@ -222,7 +221,7 @@ std::vector<Score>  Benchmark::runMultithreadedBenchmark(const int numThreads, i
     scorer.addScore("NBody", nbodyOps, elapsedNbody);
 
     //Sorting Benchmark
-    int sortSize = 50000 * std::sqrt(intensityMultiplier);
+    int sortSize = 50000 * static_cast<int>(std::sqrt(intensityMultiplier));
     auto sortRunner = [&]() {
         std::vector<std::thread> sortThreads;
         for (int i = 0; i < numThreads; ++i) {
@@ -233,7 +232,7 @@ std::vector<Score>  Benchmark::runMultithreadedBenchmark(const int numThreads, i
         }
     };
 
-    long long sortOps = 1LL * sortSize * std::log2(sortSize);
+    double sortOps = 1.0 * sortSize * std::log2(static_cast<double>(sortSize));
     double elapsedSort = Benchmark::runBenchmark(sortRunner, numRuns);
     std::cout << "Sorting benchmark completed in " << elapsedSort << " seconds.\n";
     scorer.addScore("Sorting", sortOps, elapsedSort);
@@ -270,7 +269,7 @@ std::vector<Score> Benchmark::runSingleThreadedBenchmark(int iterations, const i
     scorer.addScore("Integer", elapsedInt, elapsedInt);
 
     //Matrix multiply benchmark
-    int matrixSize = matrixMultiplySize * std::sqrt(intensityMultiplier);
+    int matrixSize = static_cast<int>(matrixMultiplySize * std::sqrt(static_cast<double>(intensityMultiplier)));
     auto matrixRunner = [&]() {
         Benchmark::matrixMultiplyBenchmark(matrixSize);
     };
@@ -291,7 +290,7 @@ std::vector<Score> Benchmark::runSingleThreadedBenchmark(int iterations, const i
 
     //NBodies Benchmark
     int steps = 10;
-    int bodies = std::sqrt(iterations);
+    int bodies = static_cast<int>(std::sqrt(iterations));
     auto nbodyRunner = [&]() {
         Benchmark::nBodyBenchmark(bodies, steps);
     };
@@ -302,13 +301,13 @@ std::vector<Score> Benchmark::runSingleThreadedBenchmark(int iterations, const i
     scorer.addScore("NBody", nbodyOps, elapsedNbody);
     
     //Sorting benchmark 
-    int sortSize = 50000 * std::sqrt(intensityMultiplier);
+    int sortSize = static_cast<int>(50000 * std::sqrt(static_cast<double>(intensityMultiplier)));
     auto sortRunner = [&]() {
         Benchmark::sortingBenchmark(sortSize);
     };
 
     double elapsedSort = Benchmark::runBenchmark(sortRunner, numRuns);
-    long long sortOps = 1LL * sortSize * std::log2(sortSize);
+    double sortOps = 1.0 * sortSize * std::log2(static_cast<double>(sortSize));
     std::cout << "Sorting benchmark completed in " << elapsedSort << " seconds.\n";
     scorer.addScore("Sorting", sortOps, elapsedSort);
 

@@ -8,6 +8,7 @@ void Scorer::normalizeWeights() {
 
 // Add a raw score (elapsed time)
 void Scorer::addScore(const std::string& benchmarkName, const double& rawScore, const double& time) {
+    (void)rawScore; //Unused parameter, will be used in future scorer updates
     double normalized = processScore(benchmarkName, time);
     
     std::lock_guard<std::mutex> lock(scoresMutex_);
