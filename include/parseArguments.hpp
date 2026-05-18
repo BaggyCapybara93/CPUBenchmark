@@ -26,10 +26,9 @@ enum class ArgType{
 
 class ParseArguments{
     private:
-        ArgType argtype_ = ArgType::Invalid;
         Mode mode_ = Mode::Invalid;
         bool saveResults_ = true;
-        int threadCount_ = std::thread::hardware_concurrency();
+        int threadCount_ = static_cast<int>(std::thread::hardware_concurrency());
         int iterations_ = 999999;
         int repeatCount_ = 1;
         int matrixMultiplySize_ = 128;
