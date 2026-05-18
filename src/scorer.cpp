@@ -9,11 +9,14 @@ void Scorer::normalizeWeights() {
 // Add a raw score (elapsed time)
 void Scorer::addScore(const std::string& benchmarkName, const double& rawScore, const double& time) {
     double normalized = processScore(benchmarkName, time);
+    
+    std::lock_guard<std::mutex> lock(scoresMutex_);
     scores_.emplace_back(benchmarkName, normalized, time);
 }
 
 // Clear all stored scores
 void Scorer::clearScores() {
+    std::lock_guard<std::mutex> lock(scoresMutex_);
     scores_.clear();
 }
 
@@ -36,6 +39,8 @@ void Scorer::loadBaselineTimes(std::shared_ptr<std::unordered_map<std::string, d
 
 // Compute final weighted score
 double Scorer::computeFinalScore() {
+    std::lock_guard<std::mutex> lock(scoresMutex_);
+    
     std::unordered_map<std::string, double> averages;
 
     // Compute average score per benchmark
@@ -62,5 +67,6 @@ double Scorer::computeFinalScore() {
 }
 
 const std::vector<Score>& Scorer::getScores(){
+    std::lock_guard<std::mutex> lock(scoresMutex_);
     return scores_;
 }

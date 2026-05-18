@@ -5,6 +5,7 @@
 #include <unordered_map>
 #include <memory>
 #include <cmath>
+#include <mutex>
 
 struct Score {
     std::string benchmarkName;
@@ -18,6 +19,7 @@ struct Score {
 class Scorer {
 private:
     std::vector<Score> scores_;
+    mutable std::mutex scoresMutex_;
 
     std::unordered_map<std::string, double> weights_ = {
         {"FloatingPoint", 0.25},
