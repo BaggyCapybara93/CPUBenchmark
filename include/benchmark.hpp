@@ -37,8 +37,6 @@ public:
     template <typename Function, typename... Args>
     static double runBenchmark(Function&& func, Args&&... args, int numRuns){
         if (numRuns <= 0) {
-            // Handle this error gracefully, perhaps throwing an exception
-                // or returning a specific error code/value.
             throw std::invalid_argument("Number of runs must be positive.");
         }
 
