@@ -1,18 +1,27 @@
 #include "scorer.hpp"
+#include "iostream"
 
 void Scorer::normalizeWeights() {
-    double sum = 0.0;
-    for (auto& w : weights_) sum += w.second;
-    for (auto& w : weights_) w.second /= sum;
+    try{
+        double sum = 0.0;
+        for (auto& w : weights_) sum += w.second;
+        for (auto& w : weights_) w.second /= sum;
+    } catch (const std::exception& e) {
+        std::cerr << "Error normalizing weights: " << e.what() << "\n";
+    }
 }
 
 // Add a raw score (elapsed time)
 void Scorer::addScore(const std::string& benchmarkName, const double& rawScore, const double& time) {
-    (void)rawScore; //Unused parameter, will be used in future scorer updates
-    double normalized = processScore(benchmarkName, time);
-    
-    std::lock_guard<std::mutex> lock(scoresMutex_);
-    scores_.emplace_back(benchmarkName, normalized, time);
+    try{
+        (void)rawScore; //Unused parameter, will be used in future scorer updates
+        double normalized = processScore(benchmarkName, time);
+
+        std::lock_guard<std::mutex> lock(scoresMutex_);
+        scores_.emplace_back(benchmarkName, normalized, time);
+    } catch (const std::exception& e) {
+        std::cerr << "Error adding score: " << e.what() << "\n";
+    }
 }
 
 // Clear all stored scores
@@ -40,31 +49,36 @@ void Scorer::loadBaselineTimes(std::shared_ptr<std::unordered_map<std::string, d
 
 // Compute final weighted score
 double Scorer::computeFinalScore() {
-    std::lock_guard<std::mutex> lock(scoresMutex_);
-    
-    std::unordered_map<std::string, double> averages;
+    try{
+        std::lock_guard<std::mutex> lock(scoresMutex_);
+        
+        std::unordered_map<std::string, double> averages;
 
-    // Compute average score per benchmark
-    for (auto& s : scores_) {
-        if (s.benchmarkName == "Combined")
-           continue;
-        averages[s.benchmarkName] += s.score;
+        // Compute average score per benchmark
+        for (auto& s : scores_) {
+            if (s.benchmarkName == "Combined")
+            continue;
+            averages[s.benchmarkName] += s.score;
+        }
+        for (auto& a : averages) {
+            int count = 0;
+            for (auto& s : scores_)
+                if (s.benchmarkName == a.first) count++;
+
+            a.second /= count;
+        }
+
+        // Weighted sum
+        double finalScore = 0.0;
+        for (auto& a : averages) {
+            finalScore += a.second * weights_[a.first];
+        }
+
+        return finalScore;
+    } catch (const std::exception& e) {
+        std::cerr << "Error computing final score: " << e.what() << "\n";
+        return 0.0;
     }
-    for (auto& a : averages) {
-        int count = 0;
-        for (auto& s : scores_)
-            if (s.benchmarkName == a.first) count++;
-
-        a.second /= count;
-    }
-
-    // Weighted sum
-    double finalScore = 0.0;
-    for (auto& a : averages) {
-        finalScore += a.second * weights_[a.first];
-    }
-
-    return finalScore;
 }
 
 const std::vector<Score>& Scorer::getScores(){

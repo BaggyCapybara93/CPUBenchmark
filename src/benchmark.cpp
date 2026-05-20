@@ -37,7 +37,7 @@ void Benchmark::matrixMultiplyBenchmark(int size) {
         sum += value;
     }
 
-    //Optimizaiton mitigation
+    //Optimization mitigation
     volatile double _ = sum;
 }
 
