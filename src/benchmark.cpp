@@ -5,6 +5,8 @@
 #include <iostream>
 #include <thread>
 
+static volatile int branchSink; //Replace this with a better fix
+
 void Benchmark::floatingPointBenchmark(int iterations) {
     volatile double result = 0.0;
     for (int i = 0; i < iterations; ++i) {
@@ -49,10 +51,13 @@ void Benchmark::branchPredictionBenchmark(int iterations){
 
     for (auto& v : pattern) v = static_cast<uint8_t>(dist(rng));
 
-    volatile int sum = 0;
+    int sum = 0;
 
     for (std::size_t i = 0; i < static_cast<std::size_t>(iterations); ++i)
         if (pattern[i]) sum++;
+    
+    // Prevent optimization
+    branchSink = sum;
 }
 
 void Benchmark::nBodyBenchmark(int nBodies, int steps) {
