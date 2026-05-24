@@ -6,87 +6,53 @@
 
 int main(int argc, char* argv[]) {
     ParseArguments args(argc, argv);
-    Benchmark benchmark;
 
-    switch (args.getMode()) {
+    Mode mode = args.getMode();
+
+    switch (mode) {
+
         case Mode::SingleThreaded: {
-            BenchmarkReport singleReport("./scores_singlethreaded");
-            // Initialize and run the coordinator
-            BenchmarkCoordinator coordinator(args, benchmark, singleReport);
-            
-            // Run the coordinator with the single-threaded runner
-            coordinator.runMode(
-                [](const ParseArguments& a, Benchmark& b) {
-                    return b.runSingleThreadedBenchmark(
-                        a.getIterations(),
-                        a.getIntensityMultiplier(),
-                        a.getMatrixMultiplySize(),
-                        a.getNumRuns()
-                    );
-                }
-            );
+            std::cout << "==========================================\n";
+            std::cout << "Running Single-Threaded Benchmark...\n";
+
+            BenchmarkReport report("./scores_singlethreaded");
+            BenchmarkCoordinator coordinator(args, report);
+
+            coordinator.run(Mode::SingleThreaded);
             return 0;
         }
-        case Mode::MultiThreaded: {
-            BenchmarkReport multiReport("./scores_multithreaded");
-            BenchmarkCoordinator coordinator(args, benchmark, multiReport);
 
-            // Run the coordinator with the multi-threaded runner
-            coordinator.runMode(
-                [](const ParseArguments& a, Benchmark& b) {
-                    return b.runMultithreadedBenchmark(
-                        a.getThreadCount(),
-                        a.getIterations(),
-                        a.getIntensityMultiplier(),
-                        a.getMatrixMultiplySize(),
-                        a.getNumRuns()
-                    );
-                }
-            );
+        case Mode::MultiThreaded: {
+            std::cout << "==========================================\n";
+            std::cout << "Running Multi-Threaded Benchmark...\n";
+
+            BenchmarkReport report("./scores_multithreaded");
+            BenchmarkCoordinator coordinator(args, report);
+
+            coordinator.run(Mode::MultiThreaded);
             return 0;
         }
 
         case Mode::Both: {
             std::cout << "==========================================\n";
-            std::cout << "Starting Single-Threaded Benchmark...\n";
-            
+            std::cout << "Running Single-Threaded Benchmark...\n";
+
             BenchmarkReport singleReport("./scores_singlethreaded");
-            BenchmarkCoordinator singleCoordinator(args, benchmark, singleReport);
-
-            auto singleRunner = [](const ParseArguments& a, Benchmark& b) {
-                return b.runSingleThreadedBenchmark(
-                    a.getIterations(),
-                    a.getIntensityMultiplier(),
-                    a.getMatrixMultiplySize(),
-                    a.getNumRuns()
-                );
-            };
-            
-            singleCoordinator.runMode(singleRunner);
-
+            BenchmarkCoordinator singleCoordinator(args, singleReport);
+            singleCoordinator.run(Mode::SingleThreaded);
 
             std::cout << "\n\n==========================================\n";
-            std::cout << "Starting Multi-Threaded Benchmark...\n";
+            std::cout << "Running Multi-Threaded Benchmark...\n";
 
             BenchmarkReport multiReport("./scores_multithreaded");
-            BenchmarkCoordinator multiCoordinator(args, benchmark, multiReport);
+            BenchmarkCoordinator multiCoordinator(args, multiReport);
+            multiCoordinator.run(Mode::MultiThreaded);
 
-            auto multiRunner = [](const ParseArguments& a, Benchmark& b) {
-                return b.runMultithreadedBenchmark(
-                    a.getThreadCount(),
-                    a.getIterations(),
-                    a.getIntensityMultiplier(),
-                    a.getMatrixMultiplySize(),
-                    a.getNumRuns()
-                );
-            };
-            
-            multiCoordinator.runMode(multiRunner);
-            
             return 0;
         }
 
-        case Mode::Invalid:{
+        case Mode::Invalid:
+        default: {
             std::cout << "Invalid benchmarking mode. Exiting...\n";
             return 1;
         }
