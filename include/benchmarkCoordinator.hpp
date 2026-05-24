@@ -27,6 +27,20 @@ class BenchmarkThreadPool{
                     workers_.emplace_back([this]() { workerLoop(); });
                 }
             }
+
+        ~BenchmarkThreadPool() {
+            stop_ = true;
+
+            // Release workers waiting on start barrier
+            startBarrier_.arrive_and_wait();
+
+            // Release workers waiting on done barrier
+            doneBarrier_.arrive_and_wait();
+
+            for (auto& t : workers_)
+                t.join();
+        }
+
         void runAll(const std::function<void()>& fn);
 };
 
