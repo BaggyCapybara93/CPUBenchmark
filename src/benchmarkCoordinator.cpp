@@ -161,7 +161,7 @@ std::vector<Score>  BenchmarkCoordinator::runMultithreadedBenchmark(const int nu
     auto sortRunner = [&]() {
         std::vector<std::thread> sortThreads;
         for (int i = 0; i < numThreads; ++i) {
-            sortThreads.emplace_back(Benchmark::sortingBenchmark, iterationsPerThread);
+            sortThreads.emplace_back(Benchmark::sortingBenchmark, sortSize);
         }
         for (auto& thread : sortThreads) {
             thread.join();
