@@ -1,6 +1,7 @@
 #include "benchmark.hpp"
 #include <chrono>
 #include <cmath>
+#include <random>
 #include <iostream>
 #include <thread>
 
@@ -42,15 +43,15 @@ void Benchmark::matrixMultiplyBenchmark(int size) {
 }
 
 void Benchmark::branchPredictionBenchmark(int iterations){
+    std::vector<uint8_t> pattern(iterations);
+    std::mt19937 rng(2026); //Random number allow this to be changed via cli later
+    std::uniform_int_distribution<int> dist(0, 1);
+
+    for (auto& v : pattern) v = dist(rng);
+
     volatile int sum = 0;
 
-    for(int i = 0; i < iterations; ++i){
-        if(i < iterations - 1) sum++;
-    }
-
-    for(int i = 0; i < iterations; ++i){
-        if(rand() % 2 == 0) sum++;
-    }
+    for (int i = 0; i < iterations; ++i) if (pattern[i]) sum++;
 }
 
 void Benchmark::nBodyBenchmark(int nBodies, int steps) {
