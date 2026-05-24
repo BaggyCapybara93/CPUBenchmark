@@ -34,9 +34,6 @@ class BenchmarkThreadPool{
             // Release workers waiting on start barrier
             startBarrier_.arrive_and_wait();
 
-            // Release workers waiting on done barrier
-            doneBarrier_.arrive_and_wait();
-
             for (auto& t : workers_)
                 t.join();
         }
