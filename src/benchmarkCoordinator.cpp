@@ -118,9 +118,9 @@ std::vector<Score>  BenchmarkCoordinator::runMultithreadedBenchmark(const int nu
     };
 
     double elapsedMatrix = Benchmark::runBenchmark(matrixRunner, numRuns);
-    int matrixOps = matrixSize * matrixSize * numThreads; // actual number of operations
+    long long matrixOps = 1LL * matrixSize * matrixSize * matrixSize * numThreads; // actual number of operations
     std::cout << "Matrix multiply benchmark completed in " << elapsedMatrix << " seconds.\n";
-    scorer.addScore("MatrixMultiply", matrixOps, elapsedMatrix);
+    scorer.addScore("MatrixMultiply", static_cast<double>(matrixOps), elapsedMatrix);
 
     //Branch Prediction Benchmark
     auto branchRunner = [&]() {
@@ -209,8 +209,8 @@ std::vector<Score> BenchmarkCoordinator::runSingleThreadedBenchmark(int iteratio
 
     double elapsedMatrix = Benchmark::runBenchmark(matrixRunner, numRuns);
     std::cout << "Matrix multiply benchmark completed in " << elapsedMatrix << " seconds.\n";
-    int matrixOps = matrixSize * matrixSize; // actual number of operations
-    scorer.addScore("MatrixMultiply", matrixOps, elapsedMatrix);
+    long long matrixOps = 1LL * matrixSize * matrixSize * matrixSize;
+    scorer.addScore("MatrixMultiply", static_cast<double>(matrixOps), elapsedMatrix);
 
     //Branch prediction benchmark
     auto branchRunner = [&]() {
