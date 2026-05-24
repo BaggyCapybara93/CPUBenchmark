@@ -3,6 +3,32 @@
 #include "benchmark.hpp"
 #include "benchmarkReport.hpp"
 #include <functional>
+#include <barrier>
+
+//Move this to a threading util file in the future
+class BenchmarkThreadPool{
+    private:
+        int numThreads_;
+        std::vector<std::thread> workers_;
+        std::function<void()> currentTask_;
+        std::barrier<> startBarrier_;
+        std::barrier<> doneBarrier_;
+        bool stop_ = false; 
+
+        void workerLoop();
+    public:
+        BenchmarkThreadPool(int numThreads)
+            :   numThreads_(numThreads),
+                startBarrier_(numThreads + 1),   // +1 for the main thread
+                doneBarrier_(numThreads + 1)
+            {
+                workers_.reserve(static_cast<size_t>(numThreads));
+                for (int i = 0; i < numThreads_; ++i) {
+                    workers_.emplace_back([this]() { workerLoop(); });
+                }
+            }
+        void runAll(const std::function<void()>& fn);
+};
 
 class BenchmarkCoordinator{
     private:

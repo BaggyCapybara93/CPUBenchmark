@@ -1,6 +1,28 @@
 #include "benchmarkCoordinator.hpp"
 #include <iostream>
 
+//Threading
+void BenchmarkThreadPool::runAll(const std::function<void()>& fn) {
+    currentTask_ = fn;
+
+    startBarrier_.arrive_and_wait();
+
+    doneBarrier_.arrive_and_wait();
+}
+
+void BenchmarkThreadPool::workerLoop() {
+    while (!stop_) {
+        startBarrier_.arrive_and_wait();
+        if (stop_) break;
+
+        currentTask_();
+
+        doneBarrier_.arrive_and_wait();
+    }
+}
+
+
+
 void BenchmarkCoordinator::runBenchmark(RunnerFunction runner)
 {
     std::vector<Score> scores = runner(args_, *this);
@@ -75,15 +97,13 @@ std::vector<Score>  BenchmarkCoordinator::runMultithreadedBenchmark(const int nu
     Scorer scorer;
     iterationsPerThread *= intensityMultiplier;
 
+    BenchmarkThreadPool pool(numThreads);
+
     // Run floating-point benchmark first
     auto floatRunner = [&]() {
-        std::vector<std::thread> floatThreads;
-        for (int i = 0; i < numThreads; ++i) {
-            floatThreads.emplace_back(Benchmark::floatingPointBenchmark, iterationsPerThread);
-        }
-        for (auto& thread : floatThreads) {
-            thread.join();
-        }
+        pool.runAll([&]() {
+            Benchmark::floatingPointBenchmark(iterationsPerThread);
+        });
     };
 
     double elapsedFloat = Benchmark::runBenchmark(floatRunner, numRuns);
@@ -92,13 +112,9 @@ std::vector<Score>  BenchmarkCoordinator::runMultithreadedBenchmark(const int nu
 
     // Integer arithmetic benchmark 
     auto intRunner = [&]() {
-        std::vector<std::thread> intThreads;
-        for (int i = 0; i < numThreads; ++i) {
-            intThreads.emplace_back(Benchmark::integerArithmeticBenchmark, iterationsPerThread);
-        }
-        for (auto& thread : intThreads) {
-            thread.join();
-        }
+        pool.runAll([&]() {
+            Benchmark::integerArithmeticBenchmark(iterationsPerThread);
+        });
     };
 
     double elapsedInt = Benchmark::runBenchmark(intRunner, numRuns);
@@ -108,13 +124,9 @@ std::vector<Score>  BenchmarkCoordinator::runMultithreadedBenchmark(const int nu
     //Matrix Multiplication Benchmark
     int matrixSize = static_cast<int>(matrixMultiplySize * std::sqrt(static_cast<double>(intensityMultiplier)));
     auto matrixRunner = [&]() {
-        std::vector<std::thread> matrixThreads;
-        for (int i = 0; i < numThreads; ++i) {
-            matrixThreads.emplace_back(Benchmark::matrixMultiplyBenchmark, matrixSize);
-        }
-        for (auto& thread : matrixThreads) {
-            thread.join();
-        }
+        pool.runAll([&]() {
+            Benchmark::matrixMultiplyBenchmark(matrixSize);
+        });
     };
 
     double elapsedMatrix = Benchmark::runBenchmark(matrixRunner, numRuns);
@@ -124,13 +136,9 @@ std::vector<Score>  BenchmarkCoordinator::runMultithreadedBenchmark(const int nu
 
     //Branch Prediction Benchmark
     auto branchRunner = [&]() {
-        std::vector<std::thread> branchThreads;
-        for (int i = 0; i < numThreads; ++i) {
-            branchThreads.emplace_back(Benchmark::branchPredictionBenchmark, iterationsPerThread);
-        }
-        for (auto& thread : branchThreads) {
-            thread.join();
-        }
+        pool.runAll([&]() {
+            Benchmark::branchPredictionBenchmark(iterationsPerThread);
+        });
     };
 
     double elapsedBranch = Benchmark::runBenchmark(branchRunner, numRuns);
@@ -142,13 +150,9 @@ std::vector<Score>  BenchmarkCoordinator::runMultithreadedBenchmark(const int nu
     int bodies = static_cast<int>(std::sqrt(iterationsPerThread));
 
     auto nbodyRunner = [&]() {
-        std::vector<std::thread> nbodyThreads;
-        for (int i = 0; i < numThreads; ++i) {
-            nbodyThreads.emplace_back(Benchmark::nBodyBenchmark, bodies, steps);
-        }
-        for (auto& thread : nbodyThreads) {
-            thread.join();
-        }
+        pool.runAll([&]() {
+            Benchmark::nBodyBenchmark(bodies, steps);
+        });
     };
 
     double nbodyOps = bodies * bodies * steps;
@@ -159,13 +163,9 @@ std::vector<Score>  BenchmarkCoordinator::runMultithreadedBenchmark(const int nu
     //Sorting Benchmark
     int sortSize = 50000 * static_cast<int>(std::sqrt(intensityMultiplier));
     auto sortRunner = [&]() {
-        std::vector<std::thread> sortThreads;
-        for (int i = 0; i < numThreads; ++i) {
-            sortThreads.emplace_back(Benchmark::sortingBenchmark, sortSize);
-        }
-        for (auto& thread : sortThreads) {
-            thread.join();
-        }
+        pool.runAll([&]() {
+            Benchmark::sortingBenchmark(sortSize);
+        });
     };
 
     double sortOps = 1.0 * sortSize * std::log2(static_cast<double>(sortSize));
