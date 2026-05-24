@@ -43,15 +43,16 @@ void Benchmark::matrixMultiplyBenchmark(int size) {
 }
 
 void Benchmark::branchPredictionBenchmark(int iterations){
-    std::vector<uint8_t> pattern(iterations);
+    std::vector<uint8_t> pattern(static_cast<size_t>(iterations));
     std::mt19937 rng(2026); //Random number allow this to be changed via cli later
     std::uniform_int_distribution<int> dist(0, 1);
 
-    for (auto& v : pattern) v = dist(rng);
+    for (auto& v : pattern) v = static_cast<uint8_t>(dist(rng));
 
     volatile int sum = 0;
 
-    for (int i = 0; i < iterations; ++i) if (pattern[i]) sum++;
+    for (std::size_t i = 0; i < static_cast<std::size_t>(iterations); ++i)
+        if (pattern[i]) sum++;
 }
 
 void Benchmark::nBodyBenchmark(int nBodies, int steps) {
