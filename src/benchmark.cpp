@@ -2,6 +2,7 @@
 #include <chrono>
 #include <cmath>
 #include <random>
+#include <algorithm>
 #include <iostream>
 #include <thread>
 
@@ -22,15 +23,34 @@ void Benchmark::integerArithmeticBenchmark(int iterations){
 }
 
 void Benchmark::matrixMultiplyBenchmark(int size) {
-    std::vector<double> A(static_cast<std::size_t>(size) * static_cast<std::size_t>(size), 1.0);
-    std::vector<double> B(static_cast<std::size_t>(size) * static_cast<std::size_t>(size), 1.0);
-    std::vector<double> C(static_cast<std::size_t>(size) * static_cast<std::size_t>(size), 0.0);
+    const size_t N = static_cast<size_t>(size);
 
-    for (std::size_t i = 0; i < static_cast<std::size_t>(size); ++i) {
-        for (std::size_t k = 0; k < static_cast<std::size_t>(size); ++k) {
-            double aik = A[i * static_cast<std::size_t>(size) + k];
-            for (std::size_t j = 0; j < static_cast<std::size_t>(size); ++j) {
-                C[i * static_cast<std::size_t>(size) + j] += aik * B[k * static_cast<std::size_t>(size) + j];
+    std::vector<double> A(N * N, 1.0);
+    std::vector<double> B(N * N, 1.0);
+    std::vector<double> C(N * N, 0.0);
+
+    const size_t block = 32; // Replace with auto-detected L1 block size util
+
+    for (size_t ii = 0; ii < N; ii += block) {
+        size_t i_end = std::min(ii + block, N);
+
+        for (size_t kk = 0; kk < N; kk += block) {
+            size_t k_end = std::min(kk + block, N);
+
+            for (size_t jj = 0; jj < N; jj += block) {
+                size_t j_end = std::min(jj + block, N);
+
+                for (size_t i = ii; i < i_end; ++i) {
+                    size_t i_row = i * N;
+
+                    for (size_t k = kk; k < k_end; ++k) {
+                        double aik = A[i_row + k];
+                        size_t k_row = k * N;
+
+                        for (size_t j = jj; j < j_end; ++j)
+                            C[i_row + j] += aik * B[k_row + j];
+                    }
+                }
             }
         }
     }
