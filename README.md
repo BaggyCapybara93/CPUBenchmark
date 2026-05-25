@@ -37,7 +37,7 @@ make
 ```
 
 ## Requirements
-- C++17 compatible compiler
+- C++20 compatible compiler
 - CMake 3.10+
 
 ## License
