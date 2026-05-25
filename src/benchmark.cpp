@@ -16,10 +16,14 @@ void Benchmark::floatingPointBenchmark(int iterations) {
 }
 
 void Benchmark::integerArithmeticBenchmark(int iterations){
-    volatile int result = 0;
-    for(int i = 0; i < iterations; ++i){
-        result += i * (i + 1)/(i + 2);
+   uint32_t result = 0;
+
+    for (int i = 1; i < iterations; ++i) {
+        result = (result * 1664525u + 1013904223u) ^ static_cast<uint32_t>(i);
     }
+
+    // New prevent optimization
+    asm volatile("" : : "r"(result) : "memory");
 }
 
 void Benchmark::matrixMultiplyBenchmark(int size) {
