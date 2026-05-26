@@ -10,7 +10,8 @@
 void Benchmark::floatingPointBenchmark(int iterations) {
     double result = 0.0;
     for (int i = 0; i < iterations; ++i) {
-        result += std::sin(i) * std::cos(i) / std::tan(i + 1);
+        double x = static_cast<double>(i);
+        result += std::sin(x) * std::cos(x) * std::tan(x + 0.5);
     }
 
     escape(result);
