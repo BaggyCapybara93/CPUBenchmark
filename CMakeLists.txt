@@ -24,8 +24,9 @@ set(SOURCE_FILES
 
 add_executable(CPUBenchmark ${SOURCE_FILES})
 
+find_package(Boost 1.71.0 CONFIG COMPONENTS program_options)
 
-target_include_directories(CPUBenchmark
-    PRIVATE
-        ${CMAKE_CURRENT_SOURCE_DIR}/include
-)
+target_include_directories(CPUBenchmark PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
+
+target_include_directories(CPUBenchmark PRIVATE ${Boost_INCLUDE_DIRS})
+target_link_libraries(CPUBenchmark PRIVATE Boost::program_options)

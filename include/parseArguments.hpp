@@ -1,13 +1,15 @@
 #pragma once
 
 #include <string>
+#include <boost/program_options.hpp>
 #include <thread>
 
 enum class Mode{
     SingleThreaded,
     MultiThreaded,
     Both,
-    Invalid
+    Invalid,
+    None,
 };
 
 enum class ArgType{
@@ -23,6 +25,8 @@ enum class ArgType{
     Both,
     Invalid
 };
+
+namespace po = boost::program_options;
 
 class ParseArguments{
     private:
@@ -49,8 +53,6 @@ class ParseArguments{
         int getIntensityMultiplier() const;
         bool shouldSaveResults() const;
         int getNumRuns() const;
-        
-        //Print
-        void printUsage() const;
 
 };
+

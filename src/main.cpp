@@ -51,6 +51,10 @@ int main(int argc, char* argv[]) {
             return 0;
         }
 
+        case Mode::None:{
+            return 1;
+        }
+
         case Mode::Invalid:
         default: {
             std::cout << "Invalid benchmarking mode. Exiting...\n";
