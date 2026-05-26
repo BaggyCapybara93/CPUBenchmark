@@ -56,6 +56,7 @@ public:
         
         return totalTime / numRuns; // Returns the average 
     }
+
     //Non-timing Functon Execution
     template <typename Function, typename... Args>
     static void execute(Function&& func, Args&&... args){

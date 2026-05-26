@@ -1,4 +1,5 @@
 #include "benchmark.hpp"
+#include "optimization_utils.hpp"
 #include <chrono>
 #include <cmath>
 #include <random>
@@ -6,13 +7,15 @@
 #include <iostream>
 #include <thread>
 
-static volatile int branchSink; //Replace this with a better fix
-
 void Benchmark::floatingPointBenchmark(int iterations) {
-    volatile double result = 0.0;
+    double result = 0.0;
     for (int i = 0; i < iterations; ++i) {
         result += std::sin(i) * std::cos(i) / std::tan(i + 1);
     }
+
+    escape(result);
+    clobber();
+
 }
 
 void Benchmark::integerArithmeticBenchmark(int iterations){
@@ -22,8 +25,8 @@ void Benchmark::integerArithmeticBenchmark(int iterations){
         result = (result * 1664525u + 1013904223u) ^ static_cast<uint32_t>(i);
     }
 
-    // New prevent optimization
-    asm volatile("" : : "r"(result) : "memory");
+    escape(result);
+    clobber();
 }
 
 void Benchmark::matrixMultiplyBenchmark(int size) {
@@ -65,7 +68,8 @@ void Benchmark::matrixMultiplyBenchmark(int size) {
     }
 
     //Optimization mitigation
-    volatile double _ = sum;
+    escape(sum);
+    clobber();
 }
 
 void Benchmark::branchPredictionBenchmark(int iterations){
@@ -81,7 +85,8 @@ void Benchmark::branchPredictionBenchmark(int iterations){
         if (pattern[i]) sum++;
     
     // Prevent optimization
-    branchSink = sum;
+    escape(sum);
+    clobber();
 }
 
 void Benchmark::nBodyBenchmark(int nBodies, int steps) {
@@ -145,8 +150,8 @@ void Benchmark::nBodyBenchmark(int nBodies, int steps) {
         }
 
         //Optimization Mitigation
-        volatile double _ = totalEnergy; 
-
+        escape(totalEnergy);
+        clobber();
     }
 }
 
@@ -158,4 +163,6 @@ void Benchmark::sortingBenchmark(int size){
     }
 
     std::sort(data.begin(), data.end());
+    escape(data[0]);
+    clobber();
 }
