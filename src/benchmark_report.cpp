@@ -1,4 +1,4 @@
-#include "benchmarkReport.hpp"
+#include "benchmark_report.hpp"
 #include <iostream>
 
 // Constructor

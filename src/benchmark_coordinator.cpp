@@ -1,4 +1,4 @@
-#include "benchmarkCoordinator.hpp"
+#include "benchmark_coordinator.hpp"
 #include <iostream>
 
 //Threading

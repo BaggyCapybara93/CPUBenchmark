@@ -1,7 +1,7 @@
 #pragma once
-#include "parseArguments.hpp"
+#include "parse_arguments.hpp"
 #include "benchmark.hpp"
-#include "benchmarkReport.hpp"
+#include "benchmark_report.hpp"
 #include <functional>
 #include <barrier>
 

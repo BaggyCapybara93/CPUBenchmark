@@ -1,7 +1,7 @@
 #include "benchmark.hpp"
-#include "parseArguments.hpp"
-#include "benchmarkReport.hpp"
-#include "benchmarkCoordinator.hpp"
+#include "parse_arguments.hpp"
+#include "benchmark_report.hpp"
+#include "benchmark_coordinator.hpp"
 #include <iostream>
 
 int main(int argc, char* argv[]) {

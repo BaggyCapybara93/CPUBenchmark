@@ -15,10 +15,10 @@ set(CMAKE_CXX_FLAGS_DEBUG "-O0 -g3")
 
 set(SOURCE_FILES
     src/benchmark.cpp
-    src/benchmarkCoordinator.cpp
-    src/benchmarkReport.cpp
+    src/benchmark_coordinator.cpp
+    src/benchmark_report.cpp
     src/main.cpp
-    src/parseArguments.cpp
+    src/parse_arguments.cpp
     src/scorer.cpp
 )
 
