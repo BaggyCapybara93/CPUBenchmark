@@ -12,26 +12,13 @@ enum class Mode{
     None,
 };
 
-enum class ArgType{
-    Help,
-    Threads,
-    Iterations,
-    IntensityMultiplier,
-    MatrixMultiplySize,
-    Repeat,
-    NumRuns,
-    SingleThreaded,
-    MultiThreaded,
-    Both,
-    Invalid
-};
-
 namespace po = boost::program_options;
 
 class ParseArguments{
     private:
         Mode mode_ = Mode::Invalid;
         bool saveResults_ = true;
+        std::string saveMethod_ = "txt"; //Make this into an enum when more methods are added
         int threadCount_ = static_cast<int>(std::thread::hardware_concurrency());
         int iterations_ = 999999;
         int repeatCount_ = 1;
@@ -46,6 +33,7 @@ class ParseArguments{
 
         //Getters
         Mode getMode() const;
+        const std::string getSaveMethod() const {return saveMethod_;}
         int getThreadCount() const;
         int getIterations() const;
         int getRepeatCount() const;

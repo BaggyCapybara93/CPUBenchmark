@@ -89,8 +89,6 @@ void BenchmarkCoordinator::run(const Mode& mode)
             break;
         }
     }
-
-    report_.saveBenchmark();
 }
 
 std::vector<Score>  BenchmarkCoordinator::runMultithreadedBenchmark(const int numThreads, int iterationsPerThread, const int intensityMultiplier, const int matrixMultiplySize, const int numRuns) {

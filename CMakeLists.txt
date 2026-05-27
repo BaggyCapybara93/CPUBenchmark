@@ -20,13 +20,16 @@ set(SOURCE_FILES
     src/main.cpp
     src/parse_arguments.cpp
     src/scorer.cpp
+    src/file_manager.cpp
 )
 
 add_executable(CPUBenchmark ${SOURCE_FILES})
 
 find_package(Boost 1.71.0 CONFIG COMPONENTS program_options)
 
+find_package(nlohmann_json REQUIRED)
+
 target_include_directories(CPUBenchmark PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
 
 target_include_directories(CPUBenchmark PRIVATE ${Boost_INCLUDE_DIRS})
-target_link_libraries(CPUBenchmark PRIVATE Boost::program_options)
+target_link_libraries(CPUBenchmark PRIVATE Boost::program_options nlohmann_json::nlohmann_json)

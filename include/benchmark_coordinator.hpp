@@ -2,6 +2,7 @@
 #include "parse_arguments.hpp"
 #include "benchmark.hpp"
 #include "benchmark_report.hpp"
+#include "file_manager.hpp"
 #include <functional>
 #include <barrier>
 

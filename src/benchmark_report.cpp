@@ -2,14 +2,9 @@
 #include <iostream>
 
 // Constructor
-BenchmarkReport::BenchmarkReport(const std::string& saveFolder)
-    : saveFolder_(saveFolder){}
+BenchmarkReport::BenchmarkReport(){}
 
 // Getters
-const std::string& BenchmarkReport::getSaveFolder() const {
-    return saveFolder_;
-}
-
 const std::vector<Score>& BenchmarkReport::getBenchmarkScores() const {
     return benchmarkScores_;
 }
@@ -37,11 +32,6 @@ double BenchmarkReport::getCombinedScore() const {
     }
 }
 
-// Setter
-void BenchmarkReport::setSaveFolder(const std::string& newSaveFolder) {
-    saveFolder_ = newSaveFolder;
-}
-
 // Add scores (append)
 void BenchmarkReport::addScore(const std::vector<Score>& benchmarks) {
     try{
@@ -52,38 +42,5 @@ void BenchmarkReport::addScore(const std::vector<Score>& benchmarks) {
         );
     } catch (const std::exception& e) {
         std::cerr << "Error adding scores: " << e.what() << "\n";   
-    }
-}
-
-// Save benchmark results
-void BenchmarkReport::saveBenchmark() {
-    try {
-        try{
-            std::filesystem::create_directories(saveFolder_);
-        } catch (const std::filesystem::filesystem_error& e) {
-            std::cerr << "Error creating directory: " << e.what() << "\n";
-            return;
-        }
-
-        std::string filename = getTimestampedFile("benchmark_scores", ".txt");
-
-        std::filesystem::path fullPath = std::filesystem::path(saveFolder_) / filename;
-
-        std::ofstream file(fullPath);
-        if (!file.is_open()) {
-            std::cerr << "Failed to open file: " << filename << "\n";
-            return;
-        }
-
-        for (const auto& s : benchmarkScores_) {
-            file << s.benchmarkName
-                << " | Score: " << s.score
-                << " | Time: " << s.time << "s\n";
-        }
-
-        file.close();
-        std::cout << "Benchmark saved to: " << fullPath << "\n";
-    } catch (const std::exception& e) {
-        std::cerr << "Error saving benchmark: " << e.what() << "\n";
     }
 }

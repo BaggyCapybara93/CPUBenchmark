@@ -22,7 +22,8 @@ void ParseArguments::parse(int argc, char* argv[]) {
             ("intensityMultiplier,im", po::value<int>(&intensityMultiplier_), "Intensity multiplier")
             ("matrixMultiplySize,mm", po::value<int>(&matrixMultiplySize_), "Matrix multiply size")
             ("repeat,r", po::value<int>(&repeatCount_), "Repeat benchmark N times")
-            ("numRuns,n", po::value<int>(&numRuns_), "Number of runs");
+            ("numRuns,n", po::value<int>(&numRuns_), "Number of runs")
+            ("saveMethod,sm", po::value<std::string>(&saveMethod_), "Method used for saving scores(JSON/txt).");
         po::variables_map vm;
         po::store(po::parse_command_line(argc, argv, desc), vm);
         po::notify(vm);
