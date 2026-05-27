@@ -91,66 +91,67 @@ void Benchmark::branchPredictionBenchmark(int iterations){
 }
 
 void Benchmark::nBodyBenchmark(int nBodies, int steps) {
-    struct Body {
-        double x, y, z;
-        double vx, vy, vz;
-        double mass;
-    };
+    using std::size_t;
 
-    std::vector<Body> bodies(static_cast<std::size_t>(nBodies));
+    const size_t N = static_cast<size_t>(nBodies);
 
-    // Initialize bodies with deterministic values
-    for (std::size_t i = 0; i < static_cast<std::size_t>(nBodies); ++i) {
-        bodies[i].x = static_cast<double>(i) * 0.01;
-        bodies[i].y = static_cast<double>(i) * 0.02;
-        bodies[i].z = static_cast<double>(i) * 0.03;
-        bodies[i].vx = bodies[i].vy = bodies[i].vz = 0.0;
-        bodies[i].mass = 1.0;
+    std::vector<double> x(N), y(N), z(N);
+    std::vector<double> vx(N, 0.0), vy(N, 0.0), vz(N, 0.0);
+    std::vector<double> mass(N, 1.0);
+
+    // Initialize positions deterministically
+    for (size_t i = 0; i < N; ++i) {
+        x[i] = static_cast<double>(i) * 0.01;
+        y[i] = static_cast<double>(i) * 0.02;
+        z[i] = static_cast<double>(i) * 0.03;
     }
 
-    const double G = 6.67430e-11;
-    const double dt = 0.01;
+    constexpr double G  = 6.67430e-11;
+    constexpr double dt = 0.01;
 
     for (int step = 0; step < steps; ++step) {
-        for (std::size_t i = 0; i < static_cast<std::size_t>(nBodies); ++i) {
+
+        // --- Compute accelerations ---
+        for (size_t i = 0; i < N; ++i) {
             double ax = 0.0, ay = 0.0, az = 0.0;
 
-            for (std::size_t j = 0; j < static_cast<std::size_t>(nBodies); ++j) {
+            for (size_t j = 0; j < N; ++j) {
                 if (i == j) continue;
 
-                double dx = bodies[j].x - bodies[i].x;
-                double dy = bodies[j].y - bodies[i].y;
-                double dz = bodies[j].z - bodies[i].z;
+                double dx = x[j] - x[i];
+                double dy = y[j] - y[i];
+                double dz = z[j] - z[i];
 
                 double distSqr = dx*dx + dy*dy + dz*dz + 1e-9;
                 double invDist = 1.0 / std::sqrt(distSqr);
                 double invDist3 = invDist * invDist * invDist;
 
-                double force = G * bodies[j].mass * invDist3;
+                double force = G * mass[j] * invDist3;
 
                 ax += dx * force;
                 ay += dy * force;
                 az += dz * force;
             }
 
-            bodies[i].vx += ax * dt;
-            bodies[i].vy += ay * dt;
-            bodies[i].vz += az * dt;
+            vx[i] += ax * dt;
+            vy[i] += ay * dt;
+            vz[i] += az * dt;
         }
 
-        for (std::size_t i = 0; i < static_cast<std::size_t>(nBodies); ++i) {
-            bodies[i].x += bodies[i].vx * dt;
-            bodies[i].y += bodies[i].vy * dt;
-            bodies[i].z += bodies[i].vz * dt;
+        // --- Update positions ---
+        for (size_t i = 0; i < N; ++i) {
+            x[i] += vx[i] * dt;
+            y[i] += vy[i] * dt;
+            z[i] += vz[i] * dt;
         }
 
+        // --- Compute kinetic energy ---
         double totalEnergy = 0.0;
-        for (const auto& body : bodies){
-            double KE = 0.5 * body.mass * (body.vx*body.vx + body.vy*body.vy + body.vz*body.vz);
+        for (size_t i = 0; i < N; ++i) {
+            double KE = 0.5 * mass[i] * (vx[i]*vx[i] + vy[i]*vy[i] + vz[i]*vz[i]);
             totalEnergy += KE;
         }
 
-        //Optimization Mitigation
         escape(totalEnergy);
         clobber();
     }
