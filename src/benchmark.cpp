@@ -168,3 +168,21 @@ void Benchmark::sortingBenchmark(int size){
     escape(data[0]);
     clobber();
 }
+
+void Benchmark::memoryBandwidthBenchmark(size_t size){
+    std::vector<double> a(size, 1.0);
+    std::vector<double> b(size, 2.0);
+    std::vector<double> c(size, 0.0);
+
+    const double scalar = 3.0;
+
+    for (std::size_t i = 0; i < size; ++i) {
+        c[i] = a[i] + scalar * b[i];
+    }
+
+    double sum = 0.0;
+    for (double v : c) sum += v;
+
+    escape(sum);
+    clobber();
+}

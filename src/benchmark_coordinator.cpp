@@ -171,8 +171,24 @@ std::vector<Score>  BenchmarkCoordinator::runMultithreadedBenchmark(const int nu
     std::cout << "Sorting benchmark completed in " << elapsedSort << " seconds.\n";
     scorer.addScore("Sorting", sortOps, elapsedSort);
 
+    // Memory Bandwidth Benchmark 
+    std::size_t memSize = static_cast<std::size_t>(iterationsPerThread) * 8; 
+
+    auto memoryRunner = [&]() {
+        pool.runAll([&]() {
+            Benchmark::memoryBandwidthBenchmark(memSize);
+        });
+    };
+
+double bytesProcessed = static_cast<double>(memSize) * static_cast<double>(sizeof(double)) * 3.0 * static_cast<double>(numThreads);
+
+    double elapsedMemory = Benchmark::runBenchmark(memoryRunner, numRuns);
+    std::cout << "Memory bandwidth benchmark completed in " << elapsedMemory << " seconds.\n";
+
+    scorer.addScore("MemoryBandwidth", bytesProcessed, elapsedMemory);
+
     // Return total duration
-    double totalTime = elapsedFloat + elapsedInt + elapsedMatrix + elapsedBranch + elapsedNbody;
+    double totalTime = elapsedFloat + elapsedInt + elapsedMatrix + elapsedBranch + elapsedNbody + elapsedMemory;
     std::cout << "Total multi-threaded benchmark time: " << totalTime << " seconds.\n";
 
     return scorer.getScores();
@@ -242,7 +258,22 @@ std::vector<Score> BenchmarkCoordinator::runSingleThreadedBenchmark(int iteratio
     std::cout << "Sorting benchmark completed in " << elapsedSort << " seconds.\n";
     scorer.addScore("Sorting", sortOps, elapsedSort);
 
-    double totalTime = elapsedFloat + elapsedInt + elapsedMatrix + elapsedBranch + elapsedNbody;
+    // Memory Bandwidth Benchmark (STREAM-like)
+    std::size_t memSize = static_cast<std::size_t>(iterations) * 8; 
+
+    auto memoryRunner = [&]() {
+        Benchmark::memoryBandwidthBenchmark(memSize);
+    };
+
+    double bytesProcessed = 3.0 * static_cast<double>(memSize) * sizeof(double);
+
+    double elapsedMemory = Benchmark::runBenchmark(memoryRunner, numRuns);
+    std::cout << "Memory bandwidth benchmark completed in " << elapsedMemory << " seconds.\n";
+
+    scorer.addScore("MemoryBandwidth", bytesProcessed, elapsedMemory);
+
+
+    double totalTime = elapsedFloat + elapsedInt + elapsedMatrix + elapsedBranch + elapsedNbody + elapsedMemory;
     std::cout << "Total single-threaded benchmark time: " << totalTime << " seconds.\n";
 
     return scorer.getScores();
