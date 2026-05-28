@@ -11,9 +11,13 @@ void BenchmarkThreadPool::runAll(const std::function<void()>& fn) {
 }
 
 void BenchmarkThreadPool::workerLoop() {
-    while (!stop_) {
+    while (true) {
         startBarrier_.arrive_and_wait();
-        if (stop_) break;
+
+        if (stop_) {
+            doneBarrier_.arrive_and_wait();
+            break;
+        }
 
         currentTask_();
 

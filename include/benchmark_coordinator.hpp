@@ -14,7 +14,7 @@ class BenchmarkThreadPool{
         std::function<void()> currentTask_;
         std::barrier<> startBarrier_;
         std::barrier<> doneBarrier_;
-        bool stop_ = false; 
+        std::atomic<bool> stop_{false}; 
 
         void workerLoop();
     public:
@@ -30,10 +30,11 @@ class BenchmarkThreadPool{
             }
 
         ~BenchmarkThreadPool() {
-            stop_ = true;
+            stop_.store(true, std::memory_order_release);
 
-            // Release workers waiting on start barrier
             startBarrier_.arrive_and_wait();
+
+            doneBarrier_.arrive_and_wait();
 
             for (auto& t : workers_)
                 t.join();
