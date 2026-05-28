@@ -18,6 +18,7 @@ public:
     static void nBodyBenchmark(int nBodies, int steps);
     static void sortingBenchmark(int size);
     static void memoryBandwidthBenchmark(size_t size);
+    static void pointerChaseBenchmark(size_t size);
 
     //Score calculator
     static double getScore(double intake, int iterations);

@@ -183,16 +183,33 @@ std::vector<Score>  BenchmarkCoordinator::runMultithreadedBenchmark(const int nu
             Benchmark::memoryBandwidthBenchmark(memSize);
         });
     };
-
-double bytesProcessed = static_cast<double>(memSize) * static_cast<double>(sizeof(double)) * 3.0 * static_cast<double>(numThreads);
+    double bytesProcessed = static_cast<double>(memSize) * static_cast<double>(sizeof(double)) * 3.0 * static_cast<double>(numThreads);
 
     double elapsedMemory = Benchmark::runBenchmark(memoryRunner, numRuns);
     std::cout << "Memory bandwidth benchmark completed in " << elapsedMemory << " seconds.\n";
 
     scorer.addScore("MemoryBandwidth", bytesProcessed, elapsedMemory);
 
+    // Pointer Chasing Benchmark
+    std::size_t chaseSize = static_cast<std::size_t>(iterationsPerThread);
+
+    auto pointerChaseRunner = [&]() {
+        pool.runAll([&]() {
+            Benchmark::pointerChaseBenchmark(chaseSize);
+        });
+    };
+
+    // Each iteration performs exactly 1 dependent pointer dereference
+    double opsProcessed = static_cast<double>(chaseSize) * static_cast<double>(numThreads);
+
+    double elapsedChase = Benchmark::runBenchmark(pointerChaseRunner, numRuns);
+    std::cout << "Pointer chase benchmark completed in " << elapsedChase << " seconds.\n";
+
+    scorer.addScore("PointerChase", opsProcessed, elapsedChase);
+
+
     // Return total duration
-    double totalTime = elapsedFloat + elapsedInt + elapsedMatrix + elapsedBranch + elapsedNbody + elapsedMemory;
+    double totalTime = elapsedFloat + elapsedInt + elapsedMatrix + elapsedBranch + elapsedNbody + elapsedMemory + elapsedChase;
     std::cout << "Total multi-threaded benchmark time: " << totalTime << " seconds.\n";
 
     return scorer.getScores();
@@ -276,8 +293,23 @@ std::vector<Score> BenchmarkCoordinator::runSingleThreadedBenchmark(int iteratio
 
     scorer.addScore("MemoryBandwidth", bytesProcessed, elapsedMemory);
 
+    //Pointer Chase benchmark
+    std::size_t chaseSize = static_cast<std::size_t>(iterations);
 
-    double totalTime = elapsedFloat + elapsedInt + elapsedMatrix + elapsedBranch + elapsedNbody + elapsedMemory;
+    auto pointerChaseRunner = [&]() {
+        Benchmark::pointerChaseBenchmark(chaseSize);
+    };
+
+    // Each iteration performs exactly 1 dependent pointer dereference
+    double opsProcessed = static_cast<double>(chaseSize);
+
+    double elapsedChase = Benchmark::runBenchmark(pointerChaseRunner, numRuns);
+    std::cout << "Pointer chase benchmark completed in " << elapsedChase << " seconds.\n";
+
+    scorer.addScore("PointerChase", opsProcessed, elapsedChase);
+
+
+    double totalTime = elapsedFloat + elapsedInt + elapsedMatrix + elapsedBranch + elapsedNbody + elapsedMemory + elapsedChase;
     std::cout << "Total single-threaded benchmark time: " << totalTime << " seconds.\n";
 
     return scorer.getScores();

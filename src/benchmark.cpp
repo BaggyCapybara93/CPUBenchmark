@@ -186,3 +186,21 @@ void Benchmark::memoryBandwidthBenchmark(size_t size){
     escape(sum);
     clobber();
 }
+
+void Benchmark::pointerChaseBenchmark(size_t size) {
+    std::vector<size_t> next(size);
+    for (size_t i = 0; i < size; ++i)
+        next[i] = i;
+
+    // Shuffle to destroy spatial locality
+    std::mt19937 rng(2026);
+    std::shuffle(next.begin(), next.end(), rng);
+
+    // Pointer-chasing loop
+    size_t idx = 0;
+    for (size_t i = 0; i < size; ++i)
+        idx = next[idx];
+
+    escape(idx);
+    clobber();
+}
