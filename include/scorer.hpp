@@ -27,7 +27,9 @@ private:
         {"Integer",       0.20},
         {"Sorting",       0.20},
         {"MatrixMultiply",0.20},
-        {"NBody",         0.15}
+        {"NBody",         0.15},
+        {"MemoryBandwidth",0.10},
+        {"PointerChase",   0.10}
     };
 
     std::unordered_map<std::string, double> baselineTimes_ = {
@@ -37,6 +39,8 @@ private:
         {"Sorting",       0.050},
         {"MatrixMultiply",0.040},
         {"NBody",         0.030},
+        {"MemoryBandwidth",0.025},
+        {"PointerChase",   0.020},
         {"Combined",         0.150}
     };
 
