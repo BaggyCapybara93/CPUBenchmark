@@ -2,7 +2,8 @@
 
 template <typename T>
 inline void escape(const T& value) {
-    asm volatile("" : : "g"(value) : "memory");
+    volatile T v = value;  // Prevent optimization
+    (void)v;
 }
 
 inline void clobber() {
