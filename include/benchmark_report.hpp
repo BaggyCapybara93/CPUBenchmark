@@ -5,18 +5,18 @@
 #include <unordered_map>
 #include <vector>
 
-class BenchmarkReport{
+class benchmark_report{
     private:
-        std::vector<Score>  benchmarkScores_;
+        std::vector<score>  benchmark_scores_;
             
     public:
         //Constructor
-        BenchmarkReport();
+        benchmark_report();
 
         //Getters
-        const std::vector<Score>& getBenchmarkScores() const;
-        double getCombinedScore() const;
+        const std::vector<score>& get_benchmark_scores() const;
+        double get_combined_score() const;
 
         //Add score
-        void addScore(const std::vector<Score>& benchmarks);
+        void add_score(const std::vector<score>& benchmarks);
 };

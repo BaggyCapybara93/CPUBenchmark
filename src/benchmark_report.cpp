@@ -2,23 +2,23 @@
 #include <iostream>
 
 // Constructor
-BenchmarkReport::BenchmarkReport(){}
+benchmark_report::benchmark_report(){}
 
 // Getters
-const std::vector<Score>& BenchmarkReport::getBenchmarkScores() const {
-    return benchmarkScores_;
+const std::vector<score>& benchmark_report::get_benchmark_scores() const {
+    return benchmark_scores_;
 }
 
-double BenchmarkReport::getCombinedScore() const {
+double benchmark_report::get_combined_score() const {
     try{
         double total = 0.0;
         int count = 0;
 
-        for (const auto& s : benchmarkScores_) {
-            if (s.benchmarkName == "Combined")
+        for (const auto& s : benchmark_scores_) {
+            if (s.benchmark_name_ == "Combined")
                 continue; // skip the synthetic entry
 
-            total += s.score;
+            total += s.score_;
             count++;
         }
 
@@ -33,10 +33,10 @@ double BenchmarkReport::getCombinedScore() const {
 }
 
 // Add scores (append)
-void BenchmarkReport::addScore(const std::vector<Score>& benchmarks) {
+void benchmark_report::add_score(const std::vector<score>& benchmarks) {
     try{
-        benchmarkScores_.insert(
-            benchmarkScores_.end(),
+        benchmark_scores_.insert(
+            benchmark_scores_.end(),
             benchmarks.begin(),
             benchmarks.end()
         );

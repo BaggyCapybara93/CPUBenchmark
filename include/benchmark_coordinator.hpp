@@ -7,58 +7,58 @@
 #include <barrier>
 
 //Move this to a threading util file in the future
-class BenchmarkThreadPool{
+class benchmark_thread_pool{
     private:
-        int numThreads_;
+        int num_threads_;
         std::vector<std::thread> workers_;
-        std::function<void()> currentTask_;
-        std::barrier<> startBarrier_;
-        std::barrier<> doneBarrier_;
+        std::function<void()> current_task_;
+        std::barrier<> start_barrier_;
+        std::barrier<> done_barrier_;
         std::atomic<bool> stop_{false}; 
 
-        void workerLoop();
+        void worker_loop();
     public:
-        BenchmarkThreadPool(int numThreads)
-            :   numThreads_(numThreads),
-                startBarrier_(numThreads + 1),   // +1 for the main thread
-                doneBarrier_(numThreads + 1)
+        benchmark_thread_pool(int num_threads)
+            :   num_threads_(num_threads),
+                start_barrier_(num_threads + 1),   // +1 for the main thread
+                done_barrier_(num_threads + 1)
             {
-                workers_.reserve(static_cast<size_t>(numThreads));
-                for (int i = 0; i < numThreads_; ++i) {
-                    workers_.emplace_back([this]() { workerLoop(); });
+                workers_.reserve(static_cast<size_t>(num_threads));
+                for (int i = 0; i < num_threads_; ++i) {
+                    workers_.emplace_back([this]() { worker_loop(); });
                 }
             }
 
-        ~BenchmarkThreadPool() {
+        ~benchmark_thread_pool() {
             stop_.store(true, std::memory_order_release);
 
-            startBarrier_.arrive_and_wait();
+            start_barrier_.arrive_and_wait();
 
-            doneBarrier_.arrive_and_wait();
+            done_barrier_.arrive_and_wait();
 
             for (auto& t : workers_)
                 t.join();
         }
 
-        void runAll(const std::function<void()>& fn);
+        void run_all(const std::function<void()>& fn);
 };
 
-class BenchmarkCoordinator{
+class benchmark_coordinator{
     private:
-        const ParseArguments& args_;
-        BenchmarkReport& report_;
+        const parse_arguments& args_;
+        benchmark_report& report_;
 
-        using RunnerFunction = std::function<std::vector<Score>(const ParseArguments&, BenchmarkCoordinator&)>;
+        using runner_function = std::function<std::vector<score>(const parse_arguments&, benchmark_coordinator&)>;
     
         //These should be changed to be more useful and customizable.
-        static std::vector<Score> runMultithreadedBenchmark(const int numThreads, int iterationsPerThread, const int intensityMultiplier = 50, const int matrixMultiplySize = 128, const int numRuns = 10);
-        static std::vector<Score> runSingleThreadedBenchmark(int iterations, const int intensityMultiplier = 50, const int matrixMultiplySize = 128, const int numRuns = 10);
+        static std::vector<score> run_multithreaded_benchmark(const int num_threads, int iterations_per_thread, const int intensity_multiplier = 50, const int matrix_multiply_size = 128, const int num_runs = 10);
+        static std::vector<score> run_singlethreaded_benchmark(int iterations, const int intensity_multiplier = 50, const int matrix_multiply_size = 128, const int num_runs = 10);
 
-        void runBenchmark(RunnerFunction runner);
+        void run_benchmark(runner_function runner);
 
     public:
-        BenchmarkCoordinator(const ParseArguments& args, BenchmarkReport& report)
+        benchmark_coordinator(const parse_arguments& args, benchmark_report& report)
             : args_(args), report_(report){}
 
-        void run(const Mode& mode);
+        void run(const mode& mode);
 };      

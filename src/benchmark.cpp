@@ -7,7 +7,7 @@
 #include <iostream>
 #include <thread>
 
-void Benchmark::floatingPointBenchmark(int iterations) {
+void benchmark::floating_point_benchmark(int iterations) {
     double result = 0.0;
     for (int i = 0; i < iterations; ++i) {
         double x = static_cast<double>(i);
@@ -19,7 +19,7 @@ void Benchmark::floatingPointBenchmark(int iterations) {
 
 }
 
-void Benchmark::integerArithmeticBenchmark(int iterations){
+void benchmark::integer_arithmetic_benchmark(int iterations){
    uint32_t result = 0;
 
     for (int i = 1; i < iterations; ++i) {
@@ -30,7 +30,7 @@ void Benchmark::integerArithmeticBenchmark(int iterations){
     clobber();
 }
 
-void Benchmark::matrixMultiplyBenchmark(int size) {
+void benchmark::matrix_multiply_benchmark(int size) {
     const size_t N = static_cast<size_t>(size);
 
     std::vector<double> A(N * N, 1.0);
@@ -73,7 +73,7 @@ void Benchmark::matrixMultiplyBenchmark(int size) {
     clobber();
 }
 
-void Benchmark::branchPredictionBenchmark(int iterations){
+void benchmark::branch_prediction_benchmark(int iterations){
     std::vector<uint8_t> pattern(static_cast<size_t>(iterations));
     std::mt19937 rng(2026); //Random number allow this to be changed via cli later
     std::uniform_int_distribution<int> dist(0, 1);
@@ -90,10 +90,10 @@ void Benchmark::branchPredictionBenchmark(int iterations){
     clobber();
 }
 
-void Benchmark::nBodyBenchmark(int nBodies, int steps) {
+void benchmark::n_body_benchmark(int n_bodies, int steps) {
     using std::size_t;
 
-    const size_t N = static_cast<size_t>(nBodies);
+    const size_t N = static_cast<size_t>(n_bodies);
 
     std::vector<double> x(N), y(N), z(N);
     std::vector<double> vx(N, 0.0), vy(N, 0.0), vz(N, 0.0);
@@ -157,7 +157,7 @@ void Benchmark::nBodyBenchmark(int nBodies, int steps) {
     }
 }
 
-void Benchmark::sortingBenchmark(int size){
+void benchmark::sorting_benchmark(int size){
     std::vector<int> data(static_cast<std::size_t>(size));
 
     for(std::size_t i = 0; i < static_cast<std::size_t>(size); ++i){
@@ -169,7 +169,7 @@ void Benchmark::sortingBenchmark(int size){
     clobber();
 }
 
-void Benchmark::memoryBandwidthBenchmark(size_t size){
+void benchmark::memory_bandwidth_benchmark(size_t size){
     std::vector<double> a(size, 1.0);
     std::vector<double> b(size, 2.0);
     std::vector<double> c(size, 0.0);
@@ -187,7 +187,7 @@ void Benchmark::memoryBandwidthBenchmark(size_t size){
     clobber();
 }
 
-void Benchmark::pointerChaseBenchmark(size_t size) {
+void benchmark::pointer_chase_benchmark(size_t size) {
     std::vector<size_t> next(size);
     for (size_t i = 0; i < size; ++i)
         next[i] = i;

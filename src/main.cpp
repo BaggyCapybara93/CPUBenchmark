@@ -6,62 +6,62 @@
 #include <iostream>
 
 int main(int argc, char* argv[]) {
-    ParseArguments args(argc, argv);
-    FileManager fm(args);
+    parse_arguments args(argc, argv);
+    file_manager fm(args);
 
-    Mode mode = args.getMode();
+    mode mode = args.get_mode();
 
     switch (mode) {
 
-        case Mode::SingleThreaded: {
+        case mode::single_threaded: {
             std::cout << "==========================================\n";
             std::cout << "Running Single-Threaded Benchmark...\n";
 
-            BenchmarkReport report;
-            BenchmarkCoordinator coordinator(args, report);
+            benchmark_report report;
+            benchmark_coordinator coordinator(args, report);
 
-            coordinator.run(Mode::SingleThreaded);
+            coordinator.run(mode::single_threaded);
             fm.save_report(report, "./scores/single_threaded");
             return 0;
         }
 
-        case Mode::MultiThreaded: {
+        case mode::multi_threaded: {
             std::cout << "==========================================\n";
             std::cout << "Running Multi-Threaded Benchmark...\n";
 
-            BenchmarkReport report;
-            BenchmarkCoordinator coordinator(args, report);
+            benchmark_report report;
+            benchmark_coordinator coordinator(args, report);
 
-            coordinator.run(Mode::MultiThreaded);
+            coordinator.run(mode::multi_threaded);
             fm.save_report(report, "./scores/multi_threaded");
             return 0;
         }
 
-        case Mode::Both: {
+        case mode::both: {
             std::cout << "==========================================\n";
             std::cout << "Running Single-Threaded Benchmark...\n";
 
-            BenchmarkReport singleReport;
-            BenchmarkCoordinator singleCoordinator(args, singleReport);
-            singleCoordinator.run(Mode::SingleThreaded);
-            fm.save_report(singleReport, "./scores/single_threaded");
+            benchmark_report single_report;
+            benchmark_coordinator single_coordinator(args, single_report);
+            single_coordinator.run(mode::single_threaded);
+            fm.save_report(single_report, "./scores/single_threaded");
 
             std::cout << "\n\n==========================================\n";
             std::cout << "Running Multi-Threaded Benchmark...\n";
 
-            BenchmarkReport multiReport;
-            BenchmarkCoordinator multiCoordinator(args, multiReport);
-            multiCoordinator.run(Mode::MultiThreaded);
-            fm.save_report(multiReport, "./scores/multi_threaded");
+            benchmark_report multi_report;
+            benchmark_coordinator multi_coordinator(args, multi_report);
+            multi_coordinator.run(mode::multi_threaded);
+            fm.save_report(multi_report, "./scores/multi_threaded");
 
             return 0;
         }
 
-        case Mode::None:{
+        case mode::none:{
             return 1;
         }
 
-        case Mode::Invalid:
+        case mode::invalid:
         default: {
             std::cout << "Invalid benchmarking mode. Exiting...\n";
             return 1;

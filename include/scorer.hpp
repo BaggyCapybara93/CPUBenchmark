@@ -7,65 +7,65 @@
 #include <cmath>
 #include <mutex>
 
-struct Score {
-    std::string benchmarkName;
-    double score; 
-    double time; 
+struct score {
+    std::string benchmark_name_;
+    double score_; 
+    double time_; 
 
-    Score(const std::string& name, double s, double t)
-        : benchmarkName(name), score(s), time(t) {}
+    score(const std::string& name, double s, double t)
+        : benchmark_name_(name), score_(s), time_(t) {}
 };
 
-class Scorer {
+class scorer {
 private:
-    std::vector<Score> scores_;
-    mutable std::mutex scoresMutex_;
+    std::vector<score> scores_;
+    mutable std::mutex scores_mutex_;
 
     std::unordered_map<std::string, double> weights_ = {
-        {"FloatingPoint", 0.25},
-        {"Branch", 0.10},
-        {"Integer",       0.20},
-        {"Sorting",       0.20},
-        {"MatrixMultiply",0.20},
-        {"NBody",         0.15},
-        {"MemoryBandwidth",0.10},
-        {"PointerChase",   0.10}
+        {"floating_point", 0.25},
+        {"branch", 0.10},
+        {"integer",       0.20},
+        {"sorting",       0.20},
+        {"matrix_multiply",0.20},
+        {"n_body",         0.15},
+        {"memory_bandwidth",0.10},
+        {"pointer_chase",   0.10}
     };
 
-    std::unordered_map<std::string, double> baselineTimes_ = {
-        {"FloatingPoint", 0.020},
-        {"Branch", 0.020},
-        {"Integer",       0.015},
-        {"Sorting",       0.050},
-        {"MatrixMultiply",0.040},
-        {"NBody",         0.030},
-        {"MemoryBandwidth",0.025},
-        {"PointerChase",   0.020},
-        {"Combined",         0.150}
+    std::unordered_map<std::string, double> baseline_times_ = {
+        {"floating_point", 0.020},
+        {"branch", 0.020},
+        {"integer",       0.015},
+        {"sorting",       0.050},
+        {"matrix_multiply",0.040},
+        {"n_body",         0.030},
+        {"memory_bandwidth",0.025},
+        {"pointer_chase",   0.020},
+        {"combined",         0.150}
     };
 
     // Normalize weights to 1.0
-    void normalizeWeights();
+    void normalize_weights();
 
 public:
 
     // Add a raw score (elapsed time)
-    void addScore(const std::string& benchmarkName, const double& rawScore, const double& time);
+    void add_score(const std::string& benchmark_name, const double& raw_score, const double& time);
 
     // Clear all stored scores
-    void clearScores();
+    void clear_scores();
 
-    double processScore(const std::string& benchmarkName, const double& elapsedTime);
+    double process_score(const std::string& benchmark_name, const double& elapsed_time);
 
     // Load custom weights
-    void loadWeights(std::shared_ptr<std::unordered_map<std::string, double>> newWeights);
+    void load_weights(std::shared_ptr<std::unordered_map<std::string, double>> new_weights);
 
     // Load custom baseline times
-    void loadBaselineTimes(std::shared_ptr<std::unordered_map<std::string, double>> newBaselineTimes);
+    void load_baseline_times(std::shared_ptr<std::unordered_map<std::string, double>> new_baseline_times);
 
     // Compute final weighted score
-    double computeFinalScore();
+    double compute_final_score();
 
     //Get the score for each specific method
-    const std::vector<Score>& getScores();
+    const std::vector<score>& get_scores();
 };

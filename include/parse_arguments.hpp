@@ -4,43 +4,43 @@
 #include <boost/program_options.hpp>
 #include <thread>
 
-enum class Mode{
-    SingleThreaded,
-    MultiThreaded,
-    Both,
-    Invalid,
-    None,
+enum class mode{
+    single_threaded,
+    multi_threaded,
+    both,
+    invalid,
+    none,
 };
 
 namespace po = boost::program_options;
 
-class ParseArguments{
+class parse_arguments{
     private:
-        Mode mode_ = Mode::Invalid;
-        bool saveResults_ = true;
-        std::string saveMethod_ = "txt"; //Make this into an enum when more methods are added
-        int threadCount_ = static_cast<int>(std::thread::hardware_concurrency());
+        mode mode_ = mode::invalid;
+        bool save_results_ = true;
+        std::string save_method_ = "txt"; //Make this into an enum when more methods are added
+        int thread_count_ = static_cast<int>(std::thread::hardware_concurrency());
         int iterations_ = 999999;
-        int repeatCount_ = 1;
-        int matrixMultiplySize_ = 128;
-        int intensityMultiplier_ = 50;
-        int numRuns_ = 5;
+        int repeat_count_ = 1;
+        int matrix_multiply_size_ = 128;
+        int intensity_multiplier_ = 50;
+        int num_runs_ = 5;
 
         void parse(int argc, char* argv[]);
     public:
         //Constructor
-        ParseArguments(int argc, char* argv[]);
+        parse_arguments(int argc, char* argv[]);
 
         //Getters
-        Mode getMode() const;
-        const std::string getSaveMethod() const {return saveMethod_;}
-        int getThreadCount() const;
-        int getIterations() const;
-        int getRepeatCount() const;
-        int getMatrixMultiplySize() const;
-        int getIntensityMultiplier() const;
-        bool shouldSaveResults() const;
-        int getNumRuns() const;
+        mode get_mode() const;
+        const std::string get_save_method() const {return save_method_;}
+        int get_thread_count() const;
+        int get_iterations() const;
+        int get_repeat_count() const;
+        int get_matrix_multiply_size() const;
+        int get_intensity_multiplier() const;
+        bool should_save_results() const;
+        int get_num_runs() const;
 
 };
 
