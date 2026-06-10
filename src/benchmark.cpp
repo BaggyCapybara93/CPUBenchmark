@@ -157,14 +157,33 @@ void benchmark::n_body_benchmark(int n_bodies, int steps) {
     }
 }
 
-void benchmark::sorting_benchmark(int size){
-    std::vector<int> data(static_cast<std::size_t>(size));
+void benchmark::sorting_benchmark(int size) {
+    using std::size_t;
 
-    for(std::size_t i = 0; i < static_cast<std::size_t>(size); ++i){
-        data[i] = size - 1;
+    // --- Preallocate ---
+    std::vector<int> data(static_cast<size_t>(size));
+    std::vector<int> backup(static_cast<size_t>(size));
+
+    // --- Generate random data ---
+    std::mt19937 rng(2026); 
+    std::uniform_int_distribution<int> dist(0, size);
+
+    for (auto& v : data)
+        v = dist(rng);
+
+    // Keep a copy so each timed run sorts identical input
+    backup = data;
+
+    // --- Warm-up run ---
+    {
+        std::vector<int> warm = data;
+        std::sort(warm.begin(), warm.end());
     }
 
+    data = backup;  // restore original unsorted data
     std::sort(data.begin(), data.end());
+
+    // Prevent optimization
     escape(data[0]);
     clobber();
 }
