@@ -20,7 +20,7 @@ int main(int argc, char* argv[]) {
             benchmark_report report;
             benchmark_coordinator coordinator(args, report);
 
-            coordinator.run(mode::single_threaded);
+            coordinator.start(mode::single_threaded);
             fm.save_report(report, "./scores/single_threaded");
             return 0;
         }
@@ -32,7 +32,7 @@ int main(int argc, char* argv[]) {
             benchmark_report report;
             benchmark_coordinator coordinator(args, report);
 
-            coordinator.run(mode::multi_threaded);
+            coordinator.start(mode::multi_threaded);
             fm.save_report(report, "./scores/multi_threaded");
             return 0;
         }
@@ -43,7 +43,7 @@ int main(int argc, char* argv[]) {
 
             benchmark_report single_report;
             benchmark_coordinator single_coordinator(args, single_report);
-            single_coordinator.run(mode::single_threaded);
+            single_coordinator.start(mode::single_threaded);
             fm.save_report(single_report, "./scores/single_threaded");
 
             std::cout << "\n\n==========================================\n";
@@ -51,7 +51,7 @@ int main(int argc, char* argv[]) {
 
             benchmark_report multi_report;
             benchmark_coordinator multi_coordinator(args, multi_report);
-            multi_coordinator.run(mode::multi_threaded);
+            multi_coordinator.start(mode::multi_threaded);
             fm.save_report(multi_report, "./scores/multi_threaded");
 
             return 0;
