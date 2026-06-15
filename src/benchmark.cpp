@@ -223,3 +223,22 @@ void benchmark::pointer_chase_benchmark(size_t size) {
     escape(idx);
     clobber();
 }
+
+void benchmark::cache_latency_benchmark(size_t size, size_t stride) {
+    std::vector<size_t> data(size);
+
+    // Initialize a simple linked list with a fixed stride
+    for (size_t i = 0; i < size; ++i)
+        data[i] = (i + stride) % size;
+
+    size_t idx = 0;
+    volatile size_t sink = 0;
+
+    // Walk through the array many times
+    for (size_t i = 0; i < size * 16; ++i)
+        idx = data[idx];
+
+    sink = idx;
+    escape(sink);
+    clobber();
+}

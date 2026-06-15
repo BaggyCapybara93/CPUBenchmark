@@ -19,6 +19,7 @@ public:
     static void sorting_benchmark(int size);
     static void memory_bandwidth_benchmark(size_t size);
     static void pointer_chase_benchmark(size_t size);
+    static void cache_latency_benchmark(size_t size, size_t stride);
 
     //Score calculator
     static double get_score(double intake, int iterations);

@@ -207,9 +207,29 @@ std::vector<score>  benchmark_coordinator::run_multithreaded_benchmark(const int
 
     scorer.add_score("pointer_chase", ops_processed, elapsed_chase);
 
+    // Cache Latency Benchmark
+    std::size_t cache_size  = static_cast<std::size_t>(iterations_per_thread);
+    std::size_t cache_stride = 16; // or expose via CLI later
+
+    auto cache_latency_runner = [&]() {
+        pool.run_all([&]() {
+            benchmark::cache_latency_benchmark(cache_size, cache_stride);
+        });
+    };
+
+    // Each iteration performs exactly 1 dependent load
+    double cache_ops_processed =
+        static_cast<double>(cache_size) * static_cast<double>(num_threads);
+
+    double elapsed_cache = benchmark::run_benchmark(cache_latency_runner, num_runs);
+
+    std::cout << "Cache latency benchmark completed in "
+            << elapsed_cache << " seconds.\n";
+
+    scorer.add_score("cache_latency", cache_ops_processed, elapsed_cache);
 
     // Return total duration
-    double total_time = elapsed_float + elapsed_int + elapsed_matrix + elapsed_branch + elapsed_nbody + elapsed_memory + elapsed_chase;
+    double total_time = elapsed_float + elapsed_int + elapsed_matrix + elapsed_branch + elapsed_nbody + elapsed_memory + elapsed_chase + elapsed_cache;
     std::cout << "Total multi-threaded benchmark time: " << total_time << " seconds.\n";
 
     return scorer.get_scores();
@@ -308,8 +328,24 @@ std::vector<score> benchmark_coordinator::run_singlethreaded_benchmark(int itera
 
     scorer.add_score("pointer_chase", ops_processed, elapsed_chase);
 
+    // Cache Latency Benchmark (single-thread)
+    std::size_t cache_size   = static_cast<std::size_t>(iterations);
+    std::size_t cache_stride = 16; // or expose via CLI later
 
-    double total_time = elapsed_float + elapsed_int + elapsed_matrix + elapsed_branch + elapsed_nbody + elapsed_memory + elapsed_chase;
+    auto cache_latency_runner = [&]() {
+        benchmark::cache_latency_benchmark(cache_size, cache_stride);
+    };
+
+    double cache_ops_processed = static_cast<double>(cache_size);
+
+    double elapsed_cache = benchmark::run_benchmark(cache_latency_runner, num_runs);
+    std::cout << "Cache latency benchmark completed in "
+            << elapsed_cache << " seconds.\n";
+
+    scorer.add_score("cache_latency", cache_ops_processed, elapsed_cache);
+
+
+    double total_time = elapsed_float + elapsed_int + elapsed_matrix + elapsed_branch + elapsed_nbody + elapsed_memory + elapsed_chase + elapsed_cache;
     std::cout << "Total single-threaded benchmark time: " << total_time << " seconds.\n";
 
     return scorer.get_scores();
