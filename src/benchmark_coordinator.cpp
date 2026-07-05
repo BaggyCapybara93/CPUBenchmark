@@ -235,7 +235,8 @@ std::vector<score> benchmark_coordinator::run(const int num_threads, int iterati
 
     // Return total duration
     double total_time = elapsed_float + elapsed_int + elapsed_matrix + elapsed_branch + elapsed_nbody + elapsed_memory + elapsed_chase + elapsed_cache;
-    std::cout << "Total multi-threaded benchmark time: " << total_time << " seconds.\n";
+    const std::string thread_label = (num_threads > 1) ? "multi-threaded" : "single-threaded";
+    std::cout << "Total " << thread_label << " benchmark time: " << total_time << " seconds.\n";
 
     return scorer.get_scores();
 }
