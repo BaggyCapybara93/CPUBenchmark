@@ -48,13 +48,3 @@ void parse_arguments::parse(int argc, char* argv[]) {
         std::cerr << "Argument parsing error: " << e.what() << "\n";
     }
 }
-
-//Getters
-mode parse_arguments::get_mode() const{return mode_;}
-int parse_arguments::get_thread_count() const{return thread_count_;}
-int parse_arguments::get_iterations() const{return iterations_;}
-int parse_arguments::get_repeat_count() const{return repeat_count_;}
-int parse_arguments::get_matrix_multiply_size() const{return matrix_multiply_size_;}
-int parse_arguments::get_intensity_multiplier() const{return intensity_multiplier_;}
-bool parse_arguments::should_save_results() const{return save_results_;}
-int parse_arguments::get_num_runs() const{return num_runs_;}

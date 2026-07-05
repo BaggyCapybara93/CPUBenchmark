@@ -32,15 +32,15 @@ class parse_arguments{
         parse_arguments(int argc, char* argv[]);
 
         //Getters
-        mode get_mode() const;
         const std::string get_save_method() const {return save_method_;}
-        int get_thread_count() const;
-        int get_iterations() const;
-        int get_repeat_count() const;
-        int get_matrix_multiply_size() const;
-        int get_intensity_multiplier() const;
-        bool should_save_results() const;
-        int get_num_runs() const;
+        mode get_mode() const{return mode_;}
+        int get_thread_count() const{return thread_count_;}
+        int get_iterations() const{return iterations_;}
+        int get_repeat_count() const{return repeat_count_;}
+        int get_matrix_multiply_size() const{return matrix_multiply_size_;}
+        int get_intensity_multiplier() const{return intensity_multiplier_;}
+        bool should_save_results() const{return save_results_;}
+        int get_num_runs() const{return num_runs_;}
 
 };
 
