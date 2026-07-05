@@ -51,7 +51,7 @@ class benchmark_coordinator{
         using runner_function = std::function<std::vector<score>(const parse_arguments&, benchmark_coordinator&)>;
     
         //These should be changed to be more useful and customizable.
-        static std::vector<score> run(const int num_threads, int iterations_per_thread, const int intensity_multiplier = 50, const int matrix_multiply_size = 128, const int num_runs = 10);
+        std::vector<score> run(const int num_threads, int iterations_per_thread, const int intensity_multiplier = 50, const int matrix_multiply_size = 128, const int num_runs = 10);
         void run_benchmark(runner_function runner);
 
     public:

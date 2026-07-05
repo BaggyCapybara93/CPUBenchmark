@@ -1,5 +1,6 @@
 #include "benchmark_coordinator.hpp"
 #include <iostream>
+#include <memory>
 
 //Threading
 void benchmark_thread_pool::run_all(const std::function<void()>& fn) {
@@ -97,8 +98,10 @@ void benchmark_coordinator::start(const mode& mode)
     }
 }
 
-std::vector<score>  benchmark_coordinator::run(const int num_threads, int iterations_per_thread, const int intensity_multiplier, const int matrix_multiply_size, const int num_runs) {
+std::vector<score> benchmark_coordinator::run(const int num_threads, int iterations_per_thread, const int intensity_multiplier, const int matrix_multiply_size, const int num_runs) {
     scorer scorer;
+    scorer.load_weights(std::make_shared<std::unordered_map<std::string, double>>(args_.get_weights()));
+    scorer.load_baseline_times(std::make_shared<std::unordered_map<std::string, double>>(args_.get_baseline_times()));
     iterations_per_thread *= intensity_multiplier;
 
     benchmark_thread_pool pool(num_threads);
