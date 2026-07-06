@@ -49,6 +49,7 @@ class parse_arguments{
         };
 
         void parse(int argc, char* argv[]);
+        std::string trim_string(const std::string& value);
         void parse_key_value_map(const std::string& input, std::unordered_map<std::string, double>& target);
     public:
         //Constructor

@@ -10,20 +10,18 @@ parse_arguments::parse_arguments(int argc, char* argv[]){
     parse(argc, argv);
 }
 
-namespace {
-    std::string trim_string(const std::string& value) {
-        std::size_t start = 0;
-        while (start < value.size() && std::isspace(static_cast<unsigned char>(value[start]))) {
-            ++start;
-        }
-
-        std::size_t end = value.size();
-        while (end > start && std::isspace(static_cast<unsigned char>(value[end - 1]))) {
-            --end;
-        }
-
-        return value.substr(start, end - start);
+std::string parse_arguments::trim_string(const std::string& value) {
+    std::size_t start = 0;
+    while (start < value.size() && std::isspace(static_cast<unsigned char>(value[start]))) {
+        ++start;
     }
+
+    std::size_t end = value.size();
+    while (end > start && std::isspace(static_cast<unsigned char>(value[end - 1]))) {
+        --end;
+    }
+
+    return value.substr(start, end - start);
 }
 
 void parse_arguments::parse_key_value_map(const std::string& input, std::unordered_map<std::string, double>& target) {
