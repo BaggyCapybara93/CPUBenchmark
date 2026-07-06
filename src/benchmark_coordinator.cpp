@@ -30,7 +30,7 @@ void benchmark_thread_pool::worker_loop() {
 
 void benchmark_coordinator::run_benchmark(runner_function runner)
 {
-    std::vector<score> scores = runner(args_, *this);
+    std::vector<score> scores = runner(*this);
     report_.add_score(scores);
 }
 
@@ -40,13 +40,13 @@ void benchmark_coordinator::start(const mode& mode)
     {
         case mode::single_threaded:
         {
-            run_benchmark([&](const parse_arguments& a, benchmark_coordinator& b) {
+            run_benchmark([&](benchmark_coordinator& b) {
                 return b.run(
                     1,  // num_threads
-                    a.get_iterations(),
-                    a.get_intensity_multiplier(),
-                    a.get_matrix_multiply_size(),
-                    a.get_num_runs()
+                    settings_.get()->iterations,
+                    settings_.get()->intensity_multiplier,
+                    settings_.get()->matrix_multiply_size,
+                    settings_.get()->num_runs
                 );
             });
             break;
@@ -54,14 +54,14 @@ void benchmark_coordinator::start(const mode& mode)
 
         case mode::multi_threaded:
         {
-            run_benchmark([&](const parse_arguments& a, benchmark_coordinator& b) {
-                int iterations_per_thread = a.get_iterations() / a.get_thread_count();
+            run_benchmark([&](benchmark_coordinator& b) {
+                int iterations_per_thread = settings_.get()->iterations / settings_.get()->thread_count;
                 return b.run(
-                    a.get_thread_count(),
+                    settings_.get()->thread_count,
                     iterations_per_thread,
-                    a.get_intensity_multiplier(),
-                    a.get_matrix_multiply_size(),
-                    a.get_num_runs()
+                    settings_.get()->intensity_multiplier,
+                    settings_.get()->matrix_multiply_size,
+                    settings_.get()->num_runs
                 );
             });
             break;
@@ -71,25 +71,25 @@ void benchmark_coordinator::start(const mode& mode)
         default:
         {
             // Run single-threaded
-            run_benchmark([&](const parse_arguments& a, benchmark_coordinator& b) {
+            run_benchmark([&](benchmark_coordinator& b) {
                 return b.run(
                     1,  // num_threads
-                    a.get_iterations(),
-                    a.get_intensity_multiplier(),
-                    a.get_matrix_multiply_size(),
-                    a.get_num_runs()
+                    settings_.get()->iterations,
+                    settings_.get()->intensity_multiplier,
+                    settings_.get()->matrix_multiply_size,
+                    settings_.get()->num_runs
                 );
             });
 
             // Run multi-threaded
-            run_benchmark([&](const parse_arguments& a, benchmark_coordinator& b) {
-                int iterations_per_thread = a.get_iterations() / a.get_thread_count();
+            run_benchmark([&](benchmark_coordinator& b) {
+                int iterations_per_thread = settings_.get()->iterations / settings_.get()->thread_count;
                 return b.run(
-                    a.get_thread_count(),
+                    settings_.get()->thread_count,
                     iterations_per_thread,
-                    a.get_intensity_multiplier(),
-                    a.get_matrix_multiply_size(),
-                    a.get_num_runs()
+                    settings_.get()->intensity_multiplier,
+                    settings_.get()->matrix_multiply_size,
+                    settings_.get()->num_runs
                 );
             });
 
@@ -100,8 +100,8 @@ void benchmark_coordinator::start(const mode& mode)
 
 std::vector<score> benchmark_coordinator::run(const int num_threads, int iterations_per_thread, const int intensity_multiplier, const int matrix_multiply_size, const int num_runs) {
     scorer scorer;
-    scorer.load_weights(std::make_shared<std::unordered_map<std::string, double>>(args_.get_weights()));
-    scorer.load_baseline_times(std::make_shared<std::unordered_map<std::string, double>>(args_.get_baseline_times()));
+    scorer.load_weights(std::make_shared<std::unordered_map<std::string, double>>(settings_.get()->weights));
+    scorer.load_baseline_times(std::make_shared<std::unordered_map<std::string, double>>(settings_.get()->baseline_times));
     iterations_per_thread *= intensity_multiplier;
 
     benchmark_thread_pool pool(num_threads);

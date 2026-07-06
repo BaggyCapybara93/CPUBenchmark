@@ -6,10 +6,10 @@ namespace fs = std::filesystem;
 
 void file_manager::save_report(const benchmark_report& report, const std::string& save_folder) const{
     try{
-        if(args_.get_save_method() == "json"){
+        if(settings_.get()->save_method == "json"){
             write_json(report, save_folder);
         }
-        else if(args_.get_save_method() == "txt"){
+        else if(settings_.get()->save_method == "txt"){
             write_txt(report, save_folder);
         }
     } catch(const std::exception& e){

@@ -1,14 +1,18 @@
 #pragma once
+#include <functional>
+#include <memory>
+#include <barrier>
+
 #include "parse_arguments.hpp"
 #include "benchmark.hpp"
 #include "benchmark_report.hpp"
 #include "file_manager.hpp"
-#include <functional>
-#include <barrier>
+#include "settings.hpp"
 
 //Move this to a threading util file in the future
 class benchmark_thread_pool{
     private:
+        std::shared_ptr<Settings> settings_;
         int num_threads_;
         std::vector<std::thread> workers_;
         std::function<void()> current_task_;
@@ -45,18 +49,18 @@ class benchmark_thread_pool{
 
 class benchmark_coordinator{
     private:
-        const parse_arguments& args_;
         benchmark_report& report_;
+        std::shared_ptr<Settings> settings_;
 
-        using runner_function = std::function<std::vector<score>(const parse_arguments&, benchmark_coordinator&)>;
+        using runner_function = std::function<std::vector<score>(benchmark_coordinator&)>;
     
         //These should be changed to be more useful and customizable.
         std::vector<score> run(const int num_threads, int iterations_per_thread, const int intensity_multiplier = 50, const int matrix_multiply_size = 128, const int num_runs = 10);
         void run_benchmark(runner_function runner);
 
     public:
-        benchmark_coordinator(const parse_arguments& args, benchmark_report& report)
-            : args_(args), report_(report){}
+        benchmark_coordinator(benchmark_report& report, std::shared_ptr<Settings> settings)
+            : report_(report), settings_(std::move(settings)) {}
 
         void start(const mode& mode);
 };      

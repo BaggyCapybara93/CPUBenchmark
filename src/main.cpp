@@ -4,12 +4,17 @@
 #include "benchmark_coordinator.hpp"
 #include "file_manager.hpp"
 #include <iostream>
+#include <memory>
 
 int main(int argc, char* argv[]) {
-    parse_arguments args(argc, argv);
-    file_manager fm(args);
+    std::shared_ptr<Settings> settings = std::make_shared<Settings>();
 
-    mode mode = args.get_mode();
+    parse_arguments args(argc, argv, settings);
+    file_manager fm(settings);
+
+    
+
+    mode mode = settings.get()->mode;
 
     switch (mode) {
 
@@ -18,7 +23,7 @@ int main(int argc, char* argv[]) {
             std::cout << "Running Single-Threaded Benchmark...\n";
 
             benchmark_report report;
-            benchmark_coordinator coordinator(args, report);
+            benchmark_coordinator coordinator(report, settings);
 
             coordinator.start(mode::single_threaded);
             fm.save_report(report, "./scores/single_threaded");
@@ -30,7 +35,7 @@ int main(int argc, char* argv[]) {
             std::cout << "Running Multi-Threaded Benchmark...\n";
 
             benchmark_report report;
-            benchmark_coordinator coordinator(args, report);
+            benchmark_coordinator coordinator(report, settings);
 
             coordinator.start(mode::multi_threaded);
             fm.save_report(report, "./scores/multi_threaded");
@@ -42,7 +47,7 @@ int main(int argc, char* argv[]) {
             std::cout << "Running Single-Threaded Benchmark...\n";
 
             benchmark_report single_report;
-            benchmark_coordinator single_coordinator(args, single_report);
+            benchmark_coordinator single_coordinator(single_report, settings);
             single_coordinator.start(mode::single_threaded);
             fm.save_report(single_report, "./scores/single_threaded");
 
@@ -50,7 +55,7 @@ int main(int argc, char* argv[]) {
             std::cout << "Running Multi-Threaded Benchmark...\n";
 
             benchmark_report multi_report;
-            benchmark_coordinator multi_coordinator(args, multi_report);
+            benchmark_coordinator multi_coordinator(multi_report, settings);
             multi_coordinator.start(mode::multi_threaded);
             fm.save_report(multi_report, "./scores/multi_threaded");
 

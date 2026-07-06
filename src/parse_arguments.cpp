@@ -5,11 +5,6 @@
 #include <cctype>
 #include <stdexcept>
 
-//Constructor
-parse_arguments::parse_arguments(int argc, char* argv[]){
-    parse(argc, argv);
-}
-
 std::string parse_arguments::trim_string(const std::string& value) {
     std::size_t start = 0;
     while (start < value.size() && std::isspace(static_cast<unsigned char>(value[start]))) {
@@ -54,13 +49,13 @@ void parse_arguments::parse(int argc, char* argv[]) {
             ("singleThreaded,st", "Run in single-threaded mode")
             ("multiThreaded,mt", "Run in multi-threaded mode")
 
-            ("threads,t", po::value<int>(&thread_count_), "Number of threads")
-            ("iterations,i", po::value<int>(&iterations_), "Iterations per thread")
-            ("intensityMultiplier,im", po::value<int>(&intensity_multiplier_), "Intensity multiplier")
-            ("matrixMultiplySize,mm", po::value<int>(&matrix_multiply_size_), "Matrix multiply size")
-            ("repeat,r", po::value<int>(&repeat_count_), "Repeat benchmark N times")
-            ("numRuns,n", po::value<int>(&num_runs_), "Number of runs")
-            ("saveMethod,sm", po::value<std::string>(&save_method_), "Method used for saving scores(JSON/txt).")
+            ("threads,t", po::value<int>(&settings_.get()->thread_count), "Number of threads")
+            ("iterations,i", po::value<int>(&settings_.get()->iterations), "Iterations per thread")
+            ("intensityMultiplier,im", po::value<int>(&settings_.get()->intensity_multiplier), "Intensity multiplier")
+            ("matrixMultiplySize,mm", po::value<int>(&settings_.get()->matrix_multiply_size), "Matrix multiply size")
+            ("repeat,r", po::value<int>(&settings_.get()->repeat_count), "Repeat benchmark N times")
+            ("numRuns,n", po::value<int>(&settings_.get()->num_runs), "Number of runs")
+            ("saveMethod,sm", po::value<std::string>(&settings_.get()->save_method), "Method used for saving scores(JSON/txt).")
             ("weights,w", po::value<std::string>(), "Override scoring weights as comma-separated name=value pairs")
             ("baselineTimes,bt", po::value<std::string>(), "Override baseline times as comma-separated name=value pairs");
         po::variables_map vm;
@@ -71,7 +66,7 @@ void parse_arguments::parse(int argc, char* argv[]) {
         // Handle help
         if (vm.count("help")) {
             std::cout << desc << "\n";
-            mode_ = mode::none;
+            settings_.get()->mode = mode::none;
             return;
         }
 
@@ -79,7 +74,7 @@ void parse_arguments::parse(int argc, char* argv[]) {
             std::unordered_map<std::string, double> parsed_weights;
             parse_key_value_map(vm["weights"].as<std::string>(), parsed_weights);
             for (const auto& [name, value] : parsed_weights) {
-                weights_[name] = value;
+                settings_.get()->weights[name] = value;
             }
         }
 
@@ -87,17 +82,17 @@ void parse_arguments::parse(int argc, char* argv[]) {
             std::unordered_map<std::string, double> parsed_baselines;
             parse_key_value_map(vm["baselineTimes"].as<std::string>(), parsed_baselines);
             for (const auto& [name, value] : parsed_baselines) {
-                baseline_times_[name] = value;
+                settings_.get()->baseline_times[name] = value;
             }
         }
 
         // Determine mode
         if (vm.count("singleThreaded"))
-            mode_ = mode::single_threaded;
+           settings_.get()->mode = mode::single_threaded;
         else if (vm.count("multiThreaded"))
-            mode_ = mode::multi_threaded;
+            settings_.get()->mode = mode::multi_threaded;
         else
-            mode_ = mode::both; // default
+            settings_.get()->mode = mode::both; // default
 
     } catch(const std::exception& e){
         std::cerr << "Argument parsing error: " << e.what() << "\n";

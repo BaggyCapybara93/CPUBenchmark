@@ -5,12 +5,15 @@
 #include <chrono>
 #include <filesystem>
 #include <sstream>
+#include <memory>
+
+#include "settings.hpp"
 #include "parse_arguments.hpp"
 #include "benchmark_report.hpp"
 
 class file_manager{
     private:
-        const parse_arguments& args_;
+        std::shared_ptr<Settings> settings_;
 
         bool ensure_directory(const std::string& path) const;
         bool write_txt(const benchmark_report& report, const std::string& save_folder) const;
@@ -29,8 +32,8 @@ class file_manager{
             return oss.str(); 
         }
     public:
-        file_manager(const parse_arguments& args) 
-            : args_(args){};
+        file_manager(std::shared_ptr<Settings> settings) 
+            : settings_(std::move(settings)) {};
 
         void save_report(const benchmark_report& report, const std::string& save_folder) const;
 
