@@ -34,8 +34,24 @@ int main(int argc, char* argv[]) {
     parse_arguments args(argc, argv, settings);
     file_manager fm(settings);
     const std::filesystem::path output_root = get_output_root(argv);
-    const std::filesystem::path single_threaded_output_dir = output_root / "scores" / "single_threaded";
-    const std::filesystem::path multi_threaded_output_dir = output_root / "scores" / "multi_threaded";
+    
+    // Get the directory containing the executable
+    std::filesystem::path executable_path(argv[0]);
+    if (!executable_path.is_absolute()) {
+        executable_path = std::filesystem::absolute(executable_path);
+    }
+    std::error_code ec;
+    const auto resolved_path = std::filesystem::weakly_canonical(executable_path, ec);
+    std::filesystem::path exe_dir;
+    if (resolved_path.has_parent_path()) {
+        exe_dir = resolved_path.parent_path();
+    } else {
+        exe_dir = resolved_path;
+    }
+    
+    // Create score directories next to the executable
+    const std::filesystem::path single_threaded_output_dir = exe_dir / "scores" / "single_threaded";
+    const std::filesystem::path multi_threaded_output_dir = exe_dir / "scores" / "multi_threaded";
 
     mode mode = settings.get()->mode;
 
