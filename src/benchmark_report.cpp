@@ -5,9 +5,11 @@
 #include <string> 
 #include <cstring> 
 #include <iostream>
+#include <fstream>
 
 #if defined(_WIN32)
 #include <intrin.h>
+#include <windows.h>
 #endif
 
 #if defined(__APPLE__)
@@ -91,9 +93,58 @@ std::string benchmark_report::collect_cpu_name() {
     #endif
 }
 
+// Get RAM size in GB
+std::string benchmark_report::collect_ram_info() {
+    std::string ram_info = "Unknown RAM";
+    
+    #if defined(__APPLE__)
+        int64_t memory_size = 0;
+        size_t size = sizeof(memory_size);
+        
+        if (sysctlbyname("hw.memsize", &memory_size, &size, NULL, 0) == 0) {
+            // Convert bytes to GB
+            double ram_gb = static_cast<double>(memory_size) / (1024.0 * 1024.0 * 1024.0);
+            ram_info = std::to_string(static_cast<long long>(ram_gb)) + " GB";
+        }
+    
+    #elif defined(__linux__)
+        std::ifstream meminfo("/proc/meminfo");
+        if (meminfo.is_open()) {
+            std::string line;
+            while (std::getline(meminfo, line)) {
+                if (line.find("MemTotal:") == 0) {
+                    // Parse the value (format: "MemTotal:       16384320 kB")
+                    std::istringstream iss(line);
+                    std::string label, value_unit;
+                    iss >> label >> value_unit;
+                    
+                    long long kb = std::stoll(value_unit);
+                    double mb = static_cast<double>(kb) / 1024.0;
+                    double gb = mb / 1024.0;
+                    
+                    ram_info = std::to_string(static_cast<long long>(gb)) + " GB";
+                    break;
+                }
+            }
+            meminfo.close();
+        }
+    #elif defined(_WIN32)
+        SIZE_T physical_memory_kib = GetPhysicallyInstalledSystemMemory();
+        
+        // Convert KB to GB
+        double ram_gb = static_cast<double>(physical_memory_kib) / (1024.0 * 1024.0);
+        ram_info = std::to_string(static_cast<long long>(ram_gb)) + " GB";
+    #else
+        ram_info = "Unknown RAM";
+    #endif
+    
+    return ram_info;
+}
+
 // Constructor
 benchmark_report::benchmark_report() {
     cpuname = collect_cpu_name();
+    ram_info = collect_ram_info();
 }
 
 // Getters
