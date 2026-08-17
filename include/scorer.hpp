@@ -11,9 +11,21 @@ struct score {
     std::string benchmark_name_;
     double score_; 
     double time_; 
+    
+    // Statistical data
+    double min_time_;
+    double max_time_;
+    double std_dev_;
+    double p95_;
+    double p99_;
 
     score(const std::string& name, double s, double t)
-        : benchmark_name_(name), score_(s), time_(t) {}
+        : benchmark_name_(name), score_(s), time_(t),
+          min_time_(t), max_time_(t), std_dev_(0.0), p95_(t), p99_(t) {}
+    
+    score(const std::string& name, double s, double t, double min_t, double max_t, double std_dev, double p95, double p99)
+        : benchmark_name_(name), score_(s), time_(t),
+          min_time_(min_t), max_time_(max_t), std_dev_(std_dev), p95_(p95), p99_(p99) {}
 };
 
 class scorer {
@@ -68,4 +80,22 @@ public:
 
     //Get the score for each specific method
     const std::vector<score>& get_scores();
+    
+    // Add multiple scores at once (for batch processing)
+    void add_scores(const std::vector<std::pair<std::string, double>>& benchmark_times);
+    
+    // Compute statistics for a benchmark
+    void compute_statistics(const std::string& benchmark_name);
+    
+    // Get statistics for a benchmark
+    struct benchmark_stats {
+        double min_time;
+        double max_time;
+        double std_dev;
+        double p95;
+        double p99;
+        int count;
+    };
+    
+    benchmark_stats get_stats(const std::string& benchmark_name);
 };
