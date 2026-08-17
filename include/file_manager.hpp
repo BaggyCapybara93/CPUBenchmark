@@ -31,10 +31,17 @@ class file_manager{
 
             return oss.str(); 
         }
+
+        //Profile save/load helpers
+        bool write_profile_txt(const benchmark_profile& profile, const std::string& save_folder) const;
+        bool read_profile_txt(const std::string& path, benchmark_profile& profile) const;
     public:
         file_manager(std::shared_ptr<Settings> settings) 
             : settings_(std::move(settings)) {};
 
+        void read_profile(const std::string& path);
         void save_report(const benchmark_report& report, const std::string& save_folder) const;
+        bool save_profile(const benchmark_profile& profile, const std::string& save_folder) const;
+        void load_profile(const std::string& profile_path);
 
 };

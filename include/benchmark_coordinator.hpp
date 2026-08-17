@@ -57,10 +57,12 @@ class benchmark_coordinator{
         //These should be changed to be more useful and customizable.
         std::vector<score> run(const int num_threads, int iterations_per_thread, const int intensity_multiplier = 50, const int matrix_multiply_size = 128, const int num_runs = 10);
         void run_benchmark(runner_function runner);
+        void run_specific_benchmarks(const std::vector<std::string>& benchmark_names);
 
     public:
         benchmark_coordinator(benchmark_report& report, std::shared_ptr<Settings> settings)
             : report_(report), settings_(std::move(settings)) {}
 
         void start(const mode& mode);
+        void start_with_profile(const std::vector<std::string>& benchmark_names, const mode& mode);
 };      

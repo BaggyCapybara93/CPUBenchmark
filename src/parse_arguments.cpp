@@ -4,6 +4,7 @@
 #include <sstream>
 #include <cctype>
 #include <stdexcept>
+#include "file_manager.hpp"
 
 std::string parse_arguments::trim_string(const std::string& value) {
     std::size_t start = 0;
@@ -57,7 +58,8 @@ void parse_arguments::parse(int argc, char* argv[]) {
             ("numRuns,n", po::value<int>(&settings_.get()->num_runs), "Number of runs")
             ("saveMethod,sm", po::value<std::string>(&settings_.get()->save_method), "Method used for saving scores(JSON/txt).")
             ("weights,w", po::value<std::string>(), "Override scoring weights as comma-separated name=value pairs")
-            ("baselineTimes,bt", po::value<std::string>(), "Override baseline times as comma-separated name=value pairs");
+            ("baselineTimes,bt", po::value<std::string>(), "Override baseline times as comma-separated name=value pairs")
+            ("profile,p", po::value<std::string>(), "Load a benchmark profile from a .txt file");
         po::variables_map vm;
         po::store(po::parse_command_line(argc, argv, desc), vm);
         po::notify(vm);
@@ -68,6 +70,12 @@ void parse_arguments::parse(int argc, char* argv[]) {
             std::cout << desc << "\n";
             settings_.get()->mode = mode::none;
             return;
+        }
+
+        if (vm.count("profile")) {
+            std::string profile_path = vm["profile"].as<std::string>();
+            file_manager fm(settings_);
+            fm.load_profile(profile_path);
         }
 
         if (vm.count("weights")) {

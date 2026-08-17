@@ -22,6 +22,8 @@ make
 ```
 
 ## Usage
+
+### Basic Usage
 ```bash
 # Run both single-threaded and multi-threaded benchmarks
 ./CPUBenchmark
@@ -34,6 +36,75 @@ make
 
 # Show help
 ./CPUBenchmark --help
+```
+
+### Benchmark Profiles
+
+Profiles allow you to create custom benchmark configurations that define which benchmarks to run and their execution parameters.
+
+#### Creating a Profile
+
+Create a `.txt` file in the `profiles/` directory:
+
+```
+name=quick_test
+benchmarks=floating_point,integer_arithmetic,branch_prediction
+iterations=100000
+repeat_count=1
+intensity_multiplier=10
+matrix_multiply_size=64
+num_runs=3
+```
+
+**Profile Fields:**
+| Field | Description | Default |
+|-------|-------------|---------|
+| `name` | Profile name | "default" |
+| `benchmarks` | Comma-separated benchmark names | All benchmarks |
+| `iterations` | Iterations per thread | 999999 |
+| `repeat_count` | Repeat count | 1 |
+| `intensity_multiplier` | Intensity multiplier | 50 |
+| `matrix_multiply_size` | Matrix size | 128 |
+| `num_runs` | Number of runs | 5 |
+
+**Available Benchmarks:**
+- `floating_point` - Floating-point operations
+- `integer_arithmetic` - Integer arithmetic
+- `matrix_multiply` - Matrix multiplication
+- `branch_prediction` - Branch prediction
+- `n_body` - N-body simulation
+- `sorting` - Sorting algorithms
+- `memory_bandwidth` - Memory bandwidth
+- `pointer_chase` - Pointer chasing
+- `cache_latency` - Cache latency
+
+#### Using Profiles
+
+```bash
+# Run with a profile (both modes)
+./CPUBenchmark --profile=profiles/quick_test.txt
+
+# Run with specific mode
+./CPUBenchmark --profile=profiles/quick_test.txt --singleThreaded
+./CPUBenchmark --profile=profiles/quick_test.txt --multiThreaded
+
+# Example: Quick test profile
+name=quick_test
+benchmarks=floating_point,integer_arithmetic,branch_prediction
+iterations=100000
+repeat_count=1
+intensity_multiplier=10
+matrix_multiply_size=64
+num_runs=3
+
+# Example: Full suite profile
+name=full_suite
+benchmarks=floating_point,integer_arithmetic,matrix_multiply,branch_prediction,n_body,sorting,memory_bandwidth,pointer_chase,cache_latency
+iterations=999999
+repeat_count=1
+intensity_multiplier=50
+matrix_multiply_size=128
+num_runs=5
 ```
 
 ## Requirements

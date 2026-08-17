@@ -2,6 +2,8 @@
 
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
+#include <vector>
 #include <boost/program_options.hpp>
 #include <thread>
 
@@ -11,6 +13,16 @@ enum class mode{
     both,
     invalid,
     none,
+};
+
+struct benchmark_profile{
+    std::vector<std::string> benchmarks;
+    int iterations = 999999;
+    int repeat_count = 1;
+    int intensity_multiplier = 50;
+    int matrix_multiply_size = 128;
+    int num_runs = 5;
+    std::string name = "default";
 };
 
 struct Settings{
@@ -45,5 +57,18 @@ struct Settings{
             {"memory_bandwidth", 0.025},
             {"pointer_chase", 0.020},
             {"combined", 0.150}
-        };
+    };
+
+    std::unordered_set<std::string> known_benchmarks = {
+        "integer_arithmetic",
+        "floating_point",
+        "matrix_multiply",
+        "branch_prediction",
+        "n_body",
+        "sorting",
+        "memory_bandwidth",
+        "pointer_chase",
+        "cache_latency"
+    };
+    benchmark_profile profile;
 };

@@ -105,3 +105,150 @@ bool file_manager::write_json(const benchmark_report& report, const std::string&
         return false;
     }
 }
+
+bool file_manager::read_profile_txt(const std::string& path, benchmark_profile& profile) const{
+    try{
+        std::ifstream file(path);
+        if (!file.is_open()) {
+            std::cerr << "Failed to open profile file: " << path << "\n";
+            return false;
+        }
+
+        std::string line;
+        while (std::getline(file, line)) {
+            // Skip empty lines and comments
+            if (line.empty() || line[0] == '#') {
+                continue;
+            }
+
+            std::istringstream iss(line);
+            std::string key;
+            std::string value;
+
+            if (iss >> key) {
+                if (key == "benchmarks") {
+                    // Read comma-separated benchmark names
+                    std::string benchmarks_str;
+                    if (iss >> value) {
+                        benchmarks_str = value;
+                        std::stringstream ss(benchmarks_str);
+                        std::string benchmark;
+                        while (std::getline(ss, benchmark, ',')) {
+                            std::string trimmed = benchmark;
+                            // Trim whitespace
+                            size_t start = trimmed.find_first_not_of(" \t");
+                            size_t end = trimmed.find_last_not_of(" \t");
+                            if (start != std::string::npos) {
+                                trimmed = trimmed.substr(start, end - start + 1);
+                                if (settings_.get()->known_benchmarks.contains(trimmed)) {
+                                    profile.benchmarks.push_back(trimmed);
+                                }
+                            }
+                        }
+                    }
+                } else if (key == "iterations") {
+                    if (iss >> value) {
+                        profile.iterations = std::stoi(value);
+                    }
+                } else if (key == "repeat_count") {
+                    if (iss >> value) {
+                        profile.repeat_count = std::stoi(value);
+                    }
+                } else if (key == "intensity_multiplier") {
+                    if (iss >> value) {
+                        profile.intensity_multiplier = std::stoi(value);
+                    }
+                } else if (key == "matrix_multiply_size") {
+                    if (iss >> value) {
+                        profile.matrix_multiply_size = std::stoi(value);
+                    }
+                } else if (key == "num_runs") {
+                    if (iss >> value) {
+                        profile.num_runs = std::stoi(value);
+                    }
+                } else if (key == "name") {
+                    if (iss >> value) {
+                        profile.name = value;
+                    }
+                }
+            }
+        }
+
+        return true;
+    }catch(const std::exception& e){
+        std::cerr << "Error reading profile: " << e.what() << "\n";
+        return false;
+    }
+}
+
+bool file_manager::write_profile_txt(const benchmark_profile& profile, const std::string& save_folder) const{
+    try{
+        std::filesystem::create_directories(save_folder);
+    } catch (const std::filesystem::filesystem_error& e) {
+        std::cerr << "Error creating directory: " << e.what() << "\n";
+        return false;
+    }
+
+    std::string filename = get_timestamped_file("profile", ".txt");
+    std::filesystem::path fullPath = std::filesystem::path(save_folder) / filename;
+
+    std::ofstream file(fullPath);
+    if (!file.is_open()) {
+        std::cerr << "Failed to open file for writing: " << fullPath << "\n";
+        return false;
+    }
+
+    file << "# Benchmark Profile\n";
+    file << "# Name: " << profile.name << "\n\n";
+
+    file << "name=" << profile.name << "\n";
+    file << "benchmarks=";
+    for (size_t i = 0; i < profile.benchmarks.size(); ++i) {
+        if (i > 0) file << ",";
+        file << " " << profile.benchmarks[i];
+    }
+    file << "\n";
+    file << "iterations=" << profile.iterations << "\n";
+    file << "repeat_count=" << profile.repeat_count << "\n";
+    file << "intensity_multiplier=" << profile.intensity_multiplier << "\n";
+    file << "matrix_multiply_size=" << profile.matrix_multiply_size << "\n";
+    file << "num_runs=" << profile.num_runs << "\n";
+
+    file.close();
+    std::cout << "Profile saved to: " << fullPath << "\n";
+    return true;
+}
+
+void file_manager::read_profile(const std::string& path){
+    benchmark_profile temp_profile;
+    if (read_profile_txt(path, temp_profile)) {
+        // Apply profile settings to current settings
+        settings_.get()->profile = temp_profile;
+    }
+}
+
+void file_manager::load_profile(const std::string& profile_path){
+    benchmark_profile temp_profile;
+    if (read_profile_txt(profile_path, temp_profile)) {
+        // Apply profile settings to current settings
+        settings_.get()->profile = temp_profile;
+        std::cout << "Profile loaded: " << profile_path << "\n";
+        std::cout << "  Profile Name: " << temp_profile.name << "\n";
+        std::cout << "  Benchmarks: ";
+        for (const auto& b : temp_profile.benchmarks) {
+            std::cout << b << " ";
+        }
+        std::cout << "\n";
+        std::cout << "  Iterations: " << temp_profile.iterations << "\n";
+        std::cout << "  Repeat Count: " << temp_profile.repeat_count << "\n";
+        std::cout << "  Intensity Multiplier: " << temp_profile.intensity_multiplier << "\n";
+        std::cout << "  Matrix Multiply Size: " << temp_profile.matrix_multiply_size << "\n";
+        std::cout << "  Num Runs: " << temp_profile.num_runs << "\n";
+    } else {
+        std::cerr << "Failed to load profile: " << profile_path << "\n";
+    }
+}
+
+bool file_manager::save_profile(const benchmark_profile& profile, const std::string& save_folder) const{
+    return write_profile_txt(profile, save_folder);
+}

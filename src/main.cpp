@@ -55,9 +55,30 @@ int main(int argc, char* argv[]) {
 
     mode mode = settings.get()->mode;
 
+    // Check if profile was loaded
+    bool use_profile = !settings->profile.benchmarks.empty();
+
     switch (mode) {
 
         case mode::single_threaded: {
+            if (use_profile) {
+                std::cout << "==========================================\n";
+                std::cout << "Running Profile Benchmark (Single-Threaded)...\n";
+                std::cout << "Profile: " << settings->profile.name << "\n";
+                std::cout << "Benchmarks: ";
+                for (const auto& b : settings->profile.benchmarks) {
+                    std::cout << b << " ";
+                }
+                std::cout << "\n\n";
+
+                benchmark_report report;
+                benchmark_coordinator coordinator(report, settings);
+
+                coordinator.start_with_profile(settings->profile.benchmarks, mode::single_threaded);
+                fm.save_report(report, single_threaded_output_dir.string());
+                return 0;
+            }
+
             std::cout << "==========================================\n";
             std::cout << "Running Single-Threaded Benchmark...\n";
 
@@ -70,6 +91,24 @@ int main(int argc, char* argv[]) {
         }
 
         case mode::multi_threaded: {
+            if (use_profile) {
+                std::cout << "==========================================\n";
+                std::cout << "Running Profile Benchmark (Multi-Threaded)...\n";
+                std::cout << "Profile: " << settings->profile.name << "\n";
+                std::cout << "Benchmarks: ";
+                for (const auto& b : settings->profile.benchmarks) {
+                    std::cout << b << " ";
+                }
+                std::cout << "\n\n";
+
+                benchmark_report report;
+                benchmark_coordinator coordinator(report, settings);
+
+                coordinator.start_with_profile(settings->profile.benchmarks, mode::multi_threaded);
+                fm.save_report(report, multi_threaded_output_dir.string());
+                return 0;
+            }
+
             std::cout << "==========================================\n";
             std::cout << "Running Multi-Threaded Benchmark...\n";
 
@@ -82,6 +121,31 @@ int main(int argc, char* argv[]) {
         }
 
         case mode::both: {
+            if (use_profile) {
+                std::cout << "==========================================\n";
+                std::cout << "Running Profile Benchmark (Both Modes)...\n";
+                std::cout << "Profile: " << settings->profile.name << "\n";
+                std::cout << "Benchmarks: ";
+                for (const auto& b : settings->profile.benchmarks) {
+                    std::cout << b << " ";
+                }
+                std::cout << "\n\n";
+
+                benchmark_report single_report;
+                benchmark_coordinator single_coordinator(single_report, settings);
+                single_coordinator.start_with_profile(settings->profile.benchmarks, mode::single_threaded);
+                fm.save_report(single_report, single_threaded_output_dir.string());
+
+                std::cout << "\n\n==========================================\n";
+                std::cout << "Running Multi-Threaded Mode...\n";
+
+                benchmark_report multi_report;
+                benchmark_coordinator multi_coordinator(multi_report, settings);
+                multi_coordinator.start_with_profile(settings->profile.benchmarks, mode::multi_threaded);
+                fm.save_report(multi_report, multi_threaded_output_dir.string());
+                return 0;
+            }
+
             std::cout << "==========================================\n";
             std::cout << "Running Single-Threaded Benchmark...\n";
 

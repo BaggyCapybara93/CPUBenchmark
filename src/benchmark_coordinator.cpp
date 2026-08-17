@@ -26,12 +26,145 @@ void benchmark_thread_pool::worker_loop() {
     }
 }
 
-
-
 void benchmark_coordinator::run_benchmark(runner_function runner)
 {
     std::vector<score> scores = runner(*this);
     report_.add_score(scores);
+}
+
+void benchmark_coordinator::run_specific_benchmarks(const std::vector<std::string>& benchmark_names){
+    scorer scorer;
+    scorer.load_weights(std::make_shared<std::unordered_map<std::string, double>>(settings_.get()->weights));
+    scorer.load_baseline_times(std::make_shared<std::unordered_map<std::string, double>>(settings_.get()->baseline_times));
+    
+    int num_threads = settings_.get()->thread_count;
+    int iterations_per_thread = settings_.get()->iterations;
+    int intensity_multiplier = settings_.get()->intensity_multiplier;
+    int matrix_multiply_size = settings_.get()->matrix_multiply_size;
+    int num_runs = settings_.get()->num_runs;
+
+    benchmark_thread_pool pool(num_threads);
+
+    for (const auto& benchmark_name : benchmark_names) {
+        std::cout << "\n=== Running benchmark: " << benchmark_name << " ===\n";
+        
+        double elapsed = 0.0;
+
+        if (benchmark_name == "floating_point") {
+            auto float_runner = [&]() {
+                pool.run_all([&]() {
+                    benchmark::floating_point_benchmark(iterations_per_thread);
+                });
+            };
+            elapsed = benchmark::run_benchmark(float_runner, num_runs);
+            std::cout << "Floating-point benchmark completed in " << elapsed << " seconds.\n";
+            scorer.add_score("floating_point", elapsed, elapsed);
+        }
+        else if (benchmark_name == "integer_arithmetic" || benchmark_name == "integer") {
+            auto int_runner = [&]() {
+                pool.run_all([&]() {
+                    benchmark::integer_arithmetic_benchmark(iterations_per_thread);
+                });
+            };
+            elapsed = benchmark::run_benchmark(int_runner, num_runs);
+            std::cout << "Integer arithmetic benchmark completed in " << elapsed << " seconds.\n";
+            scorer.add_score("integer", elapsed, elapsed);
+        }
+        else if (benchmark_name == "matrix_multiply") {
+            int actual_matrix_size = static_cast<int>(matrix_multiply_size * std::sqrt(static_cast<double>(intensity_multiplier)));
+            auto matrix_runner = [&]() {
+                pool.run_all([&]() {
+                    benchmark::matrix_multiply_benchmark(actual_matrix_size);
+                });
+            };
+            elapsed = benchmark::run_benchmark(matrix_runner, num_runs);
+            long long matrix_ops = 1LL * actual_matrix_size * actual_matrix_size * actual_matrix_size * num_threads;
+            std::cout << "Matrix multiply benchmark completed in " << elapsed << " seconds.\n";
+            scorer.add_score("matrix_multiply", static_cast<double>(matrix_ops), elapsed);
+        }
+        else if (benchmark_name == "branch_prediction" || benchmark_name == "branch") {
+            auto branch_runner = [&]() {
+                pool.run_all([&]() {
+                    benchmark::branch_prediction_benchmark(iterations_per_thread);
+                });
+            };
+            elapsed = benchmark::run_benchmark(branch_runner, num_runs);
+            std::cout << "Branch prediction benchmark completed in " << elapsed << " seconds.\n";
+            scorer.add_score("branch", elapsed, elapsed);
+        }
+        else if (benchmark_name == "n_body") {
+            int steps = 10;
+            int bodies = static_cast<int>(std::sqrt(iterations_per_thread));
+            auto nbody_runner = [&]() {
+                pool.run_all([&]() {
+                    benchmark::n_body_benchmark(bodies, steps);
+                });
+            };
+            double nbody_ops = static_cast<double>(bodies) * bodies * steps;
+            elapsed = benchmark::run_benchmark(nbody_runner, num_runs);
+            std::cout << "NBody benchmark completed in " << elapsed << " seconds.\n";
+            scorer.add_score("n_body", nbody_ops, elapsed);
+        }
+        else if (benchmark_name == "sorting") {
+            int sort_size = 50000 * static_cast<int>(std::sqrt(intensity_multiplier));
+            auto sort_runner = [&]() {
+                pool.run_all([&]() {
+                    benchmark::sorting_benchmark(sort_size);
+                });
+            };
+            double sort_ops = 1.0 * sort_size * std::log2(static_cast<double>(sort_size));
+            elapsed = benchmark::run_benchmark(sort_runner, num_runs);
+            std::cout << "Sorting benchmark completed in " << elapsed << " seconds.\n";
+            scorer.add_score("sorting", sort_ops, elapsed);
+        }
+        else if (benchmark_name == "memory_bandwidth") {
+            std::size_t mem_size = static_cast<std::size_t>(iterations_per_thread) * 8;
+            auto memory_runner = [&]() {
+                pool.run_all([&]() {
+                    benchmark::memory_bandwidth_benchmark(mem_size);
+                });
+            };
+            double bytes_processed = static_cast<double>(mem_size) * static_cast<double>(sizeof(double)) * 3.0 * static_cast<double>(num_threads);
+            elapsed = benchmark::run_benchmark(memory_runner, num_runs);
+            std::cout << "Memory bandwidth benchmark completed in " << elapsed << " seconds.\n";
+            scorer.add_score("memory_bandwidth", bytes_processed, elapsed);
+        }
+        else if (benchmark_name == "pointer_chase" || benchmark_name == "pointer") {
+            std::size_t chase_size = static_cast<std::size_t>(iterations_per_thread);
+            auto pointer_chase_runner = [&]() {
+                pool.run_all([&]() {
+                    benchmark::pointer_chase_benchmark(chase_size);
+                });
+            };
+            double ops_processed_ptr = static_cast<double>(chase_size) * static_cast<double>(num_threads);
+            elapsed = benchmark::run_benchmark(pointer_chase_runner, num_runs);
+            std::cout << "Pointer chase benchmark completed in " << elapsed << " seconds.\n";
+            scorer.add_score("pointer_chase", ops_processed_ptr, elapsed);
+        }
+        else if (benchmark_name == "cache_latency" || benchmark_name == "cache") {
+            std::size_t cache_size = static_cast<std::size_t>(iterations_per_thread);
+            std::size_t cache_stride = 16;
+            auto cache_latency_runner = [&]() {
+                pool.run_all([&]() {
+                    benchmark::cache_latency_benchmark(cache_size, cache_stride);
+                });
+            };
+            double cache_ops_processed = static_cast<double>(cache_size) * static_cast<double>(num_threads);
+            elapsed = benchmark::run_benchmark(cache_latency_runner, num_runs);
+            std::cout << "Cache latency benchmark completed in " << elapsed << " seconds.\n";
+            scorer.add_score("cache_latency", cache_ops_processed, elapsed);
+        }
+        else {
+            std::cerr << "Unknown benchmark: " << benchmark_name << "\n";
+            continue;
+        }
+
+        std::cout << "Benchmark score: " << scorer.compute_final_score() << "\n";
+    }
+
+    double total_time = 0.0;
+    const std::string thread_label = (num_threads > 1) ? "multi-threaded" : "single-threaded";
+    std::cout << "\nTotal " << thread_label << " benchmark time: " << total_time << " seconds.\n";
 }
 
 void benchmark_coordinator::start(const mode& mode)
@@ -93,6 +226,43 @@ void benchmark_coordinator::start(const mode& mode)
                 );
             });
 
+            break;
+        }
+    }
+}
+
+void benchmark_coordinator::start_with_profile(const std::vector<std::string>& benchmark_names, const mode& mode){
+    if (benchmark_names.empty()) {
+        std::cerr << "No benchmarks specified in profile.\n";
+        return;
+    }
+
+    std::cout << "Running " << benchmark_names.size() << " benchmarks from profile...\n";
+
+    switch (mode)
+    {
+        case mode::single_threaded:
+        {
+            run_specific_benchmarks(benchmark_names);
+            break;
+        }
+
+        case mode::multi_threaded:
+        {
+            run_specific_benchmarks(benchmark_names);
+            break;
+        }
+
+        case mode::both:
+        default:
+        {
+            // Run single-threaded first
+            std::cout << "\n=== Single-threaded Mode ===\n";
+            run_specific_benchmarks(benchmark_names);
+
+            // Run multi-threaded
+            std::cout << "\n=== Multi-threaded Mode ===\n";
+            run_specific_benchmarks(benchmark_names);
             break;
         }
     }
