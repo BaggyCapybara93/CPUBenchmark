@@ -4,6 +4,8 @@
 #include <unordered_map>
 #include <vector>
 #include <iostream>
+#include <string>
+#include <filesystem>
 
 class benchmark_report{
     private:
@@ -44,4 +46,12 @@ class benchmark_report{
         
         // Compute statistics for all benchmarks
         void compute_all_statistics();
+        
+        // Compare with previous benchmark runs
+        bool compare_with_previous(const std::string& save_folder, const std::string& mode_type) const;
+        
+        // Check if CPU and RAM are similar between runs
+        static bool are_systems_similar(const std::string& cpu1, const std::string& ram1, 
+                                        const std::string& cpu2, const std::string& ram2,
+                                        double similarity_threshold = 0.8);
 };

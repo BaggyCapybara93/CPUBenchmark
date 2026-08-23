@@ -3,6 +3,8 @@
 using json = nlohmann::json;
 namespace fs = std::filesystem;
 
+#include <iomanip>
+
 
 void file_manager::save_report(const benchmark_report& report, const std::string& save_folder) const{
     try{
@@ -49,17 +51,52 @@ bool file_manager::write_txt(const benchmark_report& report, const std::string& 
         }
 
         // Write CPU name and RAM at the top
+        file << "==========================================\n";
         file << "CPU: " << report.get_cpu_name() << "\n";
-        file << "RAM: " << report.get_ram_info() << "\n\n";
+        file << "RAM: " << report.get_ram_info() << "\n";
+        file << "==========================================\n\n";
 
+        // Compute and write statistics for each benchmark
         for (const auto& s : report.get_benchmark_scores()) {
-            file << s.benchmark_name_
-                << " | Score: " << s.score_
-                << " | Time: " << s.time_ << "s\n";
+            if (s.benchmark_name_ == "Combined") continue;
+            
+            auto stats = report.get_stats(s.benchmark_name_);
+            
+            file << "------------------------------------------\n";
+            file << s.benchmark_name_ << "\n";
+            file << "------------------------------------------\n";
+            file << "Score: " << std::fixed << std::setprecision(2) << s.score_ << "\n";
+            file << "Time (mean): " << std::fixed << std::setprecision(6) << s.time_ << "s\n";
+            file << "Min: " << stats.min_time << "s\n";
+            file << "Max: " << stats.max_time << "s\n";
+            file << "Std Dev: " << std::fixed << std::setprecision(6) << stats.std_dev << "s\n";
+            file << "P95: " << stats.p95 << "s\n";
+            file << "P99: " << stats.p99 << "s\n";
+            file << "Sample Count: " << stats.count << "\n";
+            file << "\n";
         }
+
+        // Write combined score (no statistics - it's a synthetic aggregate)
+        file << "==========================================\n";
+        file << "COMBINED SCORE\n";
+        file << "==========================================\n";
+        file << "Score: " << std::fixed << std::setprecision(2) << report.get_combined_score() << "\n";
+        file << "Note: Combined score is a weighted aggregate of individual benchmarks\n";
 
         file.close();
         std::cout << "Benchmark saved to: " << fullPath << "\n";
+        
+        // Compare with previous runs
+        std::string mode_str;
+        if (settings_.get()->mode == mode::single_threaded) {
+            mode_str = "single_threaded";
+        } else if (settings_.get()->mode == mode::multi_threaded) {
+            mode_str = "multi_threaded";
+        } else {
+            mode_str = "both";
+        }
+        report.compare_with_previous(save_folder, mode_str);
+        
         return true;
     } catch (const std::exception& e) {
         std::cerr << "Error saving benchmark: " << e.what() << "\n";
@@ -82,12 +119,21 @@ bool file_manager::write_json(const benchmark_report& report, const std::string&
         j["cpuName"] = report.get_cpu_name();
         j["ramInfo"] = report.get_ram_info();
 
-        // Serialize scores
+        // Serialize scores with statistics
         j["scores"] = json::array();
         for (const auto& s : report.get_benchmark_scores()) {
+            auto stats = report.get_stats(s.benchmark_name_);
+            
             j["scores"].push_back({
                 {"benchmarkName", s.benchmark_name_},
-                {"score", s.score_}
+                {"score", s.score_},
+                {"time", s.time_},
+                {"minTime", stats.min_time},
+                {"maxTime", stats.max_time},
+                {"stdDev", stats.std_dev},
+                {"p95", stats.p95},
+                {"p99", stats.p99},
+                {"sampleCount", stats.count}
             });
         }
 
