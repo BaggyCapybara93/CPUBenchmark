@@ -5,12 +5,21 @@
 #include <numeric>
 #include <map>
 #include <utility>
+#include <stdexcept>
 
 void scorer::normalize_weights() {
     try{
         double sum = 0.0;
         for (auto& w : weights_) sum += w.second;
-        for (auto& w : weights_) w.second /= sum;
+        if (!std::isfinite(sum) || sum <= 0.0) {
+            throw std::invalid_argument("At least one scoring weight must be positive and finite");
+        }
+        for (auto& w : weights_) {
+            if (!std::isfinite(w.second) || w.second < 0.0) {
+                throw std::invalid_argument("Scoring weights must be finite and non-negative");
+            }
+            w.second /= sum;
+        }
     } catch (const std::exception& e) {
         std::cerr << "Error normalizing weights: " << e.what() << "\n";
     }
@@ -93,12 +102,14 @@ void scorer::compute_statistics(const std::string& benchmark_name) {
         double p99 = times[p99_idx_int];
         
         // Update the first score entry with statistics
-        if (!scores_.empty() && scores_.front().benchmark_name_ == benchmark_name) {
-            scores_.front().min_time_ = min_t;
-            scores_.front().max_time_ = max_t;
-            scores_.front().std_dev_ = std_dev;
-            scores_.front().p95_ = p95;
-            scores_.front().p99_ = p99;
+        const auto score_it = std::find_if(scores_.begin(), scores_.end(),
+            [&benchmark_name](const score& entry) { return entry.benchmark_name_ == benchmark_name; });
+        if (score_it != scores_.end()) {
+            score_it->min_time_ = min_t;
+            score_it->max_time_ = max_t;
+            score_it->std_dev_ = std_dev;
+            score_it->p95_ = p95;
+            score_it->p99_ = p99;
         }
     } catch (const std::exception& e) {
         std::cerr << "Error computing statistics: " << e.what() << "\n";
@@ -159,7 +170,14 @@ void scorer::clear_scores() {
 }
 
 double scorer::process_score(const std::string& benchmark_name, const double& elapsed_time) {
-    double baseline = baseline_times_[benchmark_name];
+    if (!std::isfinite(elapsed_time) || elapsed_time <= 0.0) {
+        throw std::invalid_argument("Elapsed benchmark time must be finite and positive");
+    }
+    const auto baseline_it = baseline_times_.find(benchmark_name);
+    if (baseline_it == baseline_times_.end() || !std::isfinite(baseline_it->second) || baseline_it->second <= 0.0) {
+        throw std::invalid_argument("Missing or invalid baseline for benchmark: " + benchmark_name);
+    }
+    const double baseline = baseline_it->second;
     double normalized = baseline / elapsed_time;
     return normalized * 2500.0; 
 }

@@ -101,10 +101,19 @@ void parse_arguments::parse(int argc, char* argv[]) {
             parsed_settings.repeat_count <= 0 || parsed_settings.num_runs <= 0) {
             throw std::invalid_argument("threads, iterations, repeat, numRuns, intensityMultiplier, and matrixMultiplySize must be positive");
         }
+        if (!vm.count("singleThreaded") &&
+            parsed_settings.iterations < parsed_settings.thread_count) {
+            throw std::invalid_argument("iterations must be at least the thread count in multi-threaded mode");
+        }
+        double weight_sum = 0.0;
         for (const auto& [name, value] : parsed_settings.weights) {
             if (!std::isfinite(value) || value < 0.0) {
                 throw std::invalid_argument("Weight for '" + name + "' must be finite and non-negative");
             }
+            weight_sum += value;
+        }
+        if (!std::isfinite(weight_sum) || weight_sum <= 0.0) {
+            throw std::invalid_argument("At least one scoring weight must be positive");
         }
         for (const auto& [name, value] : parsed_settings.baseline_times) {
             if (!std::isfinite(value) || value <= 0.0) {

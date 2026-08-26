@@ -2,6 +2,8 @@
 #include <functional>
 #include <memory>
 #include <barrier>
+#include <exception>
+#include <mutex>
 
 #include "parse_arguments.hpp"
 #include "benchmark.hpp"
@@ -19,6 +21,8 @@ class benchmark_thread_pool{
         std::barrier<> start_barrier_;
         std::barrier<> done_barrier_;
         std::atomic<bool> stop_{false}; 
+        std::exception_ptr worker_exception_;
+        std::mutex worker_exception_mutex_;
 
         void worker_loop();
     public:

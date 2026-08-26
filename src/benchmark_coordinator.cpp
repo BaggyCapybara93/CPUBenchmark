@@ -4,11 +4,20 @@
 
 //Threading
 void benchmark_thread_pool::run_all(const std::function<void()>& fn) {
-    current_task_ = fn;
+    {
+        std::lock_guard<std::mutex> lock(worker_exception_mutex_);
+        worker_exception_ = nullptr;
+        current_task_ = fn;
+    }
 
     start_barrier_.arrive_and_wait();
 
     done_barrier_.arrive_and_wait();
+
+    std::lock_guard<std::mutex> lock(worker_exception_mutex_);
+    if (worker_exception_) {
+        std::rethrow_exception(worker_exception_);
+    }
 }
 
 void benchmark_thread_pool::worker_loop() {
@@ -20,7 +29,14 @@ void benchmark_thread_pool::worker_loop() {
             break;
         }
 
-        current_task_();
+        try {
+            current_task_();
+        } catch (...) {
+            std::lock_guard<std::mutex> lock(worker_exception_mutex_);
+            if (!worker_exception_) {
+                worker_exception_ = std::current_exception();
+            }
+        }
 
         done_barrier_.arrive_and_wait();
     }
@@ -336,7 +352,7 @@ std::vector<score> benchmark_coordinator::run(const int num_threads, int iterati
         });
     };
 
-    double nbody_ops = bodies * bodies * steps;
+    double nbody_ops = static_cast<double>(bodies) * static_cast<double>(bodies) * static_cast<double>(steps);
     double elapsed_nbody = benchmark::run_benchmark(nbody_runner, num_runs);
     std::cout << "NBody benchmark completed in " << elapsed_nbody << " seconds.\n";
     scorer.add_score("n_body", nbody_ops, elapsed_nbody);
@@ -408,7 +424,7 @@ std::vector<score> benchmark_coordinator::run(const int num_threads, int iterati
     scorer.add_score("cache_latency", cache_ops_processed, elapsed_cache);
 
     // Return total duration
-    double total_time = elapsed_float + elapsed_int + elapsed_matrix + elapsed_branch + elapsed_nbody + elapsed_memory + elapsed_chase + elapsed_cache;
+    double total_time = elapsed_float + elapsed_int + elapsed_matrix + elapsed_branch + elapsed_nbody + elapsed_sort + elapsed_memory + elapsed_chase + elapsed_cache;
     const std::string thread_label = (num_threads > 1) ? "multi-threaded" : "single-threaded";
     std::cout << "Total " << thread_label << " benchmark time: " << total_time << " seconds.\n";
 

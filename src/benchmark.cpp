@@ -5,6 +5,7 @@
 #include <random>
 #include <algorithm>
 #include <iostream>
+#include <numeric>
 #include <thread>
 
 void benchmark::floating_point_benchmark(int iterations) {
@@ -174,13 +175,7 @@ void benchmark::sorting_benchmark(int size) {
     // Keep a copy so each timed run sorts identical input
     backup = data;
 
-    // --- Warm-up run ---
-    {
-        std::vector<int> warm = data;
-        std::sort(warm.begin(), warm.end());
-    }
-
-    data = backup;  // restore original unsorted data
+    data = backup;
     std::sort(data.begin(), data.end());
 
     // Prevent optimization
@@ -207,15 +202,21 @@ void benchmark::memory_bandwidth_benchmark(size_t size){
 }
 
 void benchmark::pointer_chase_benchmark(size_t size) {
-    std::vector<size_t> next(size);
-    for (size_t i = 0; i < size; ++i)
-        next[i] = i;
+    if (size == 0) {
+        return;
+    }
 
-    // Shuffle to destroy spatial locality
+    std::vector<size_t> order(size);
+    std::iota(order.begin(), order.end(), 0);
+
     std::mt19937 rng(2026);
-    std::shuffle(next.begin(), next.end(), rng);
+    std::shuffle(order.begin(), order.end(), rng);
 
-    // Pointer-chasing loop
+    std::vector<size_t> next(size);
+    for (size_t i = 0; i < size; ++i) {
+        next[order[i]] = order[(i + 1) % size];
+    }
+
     size_t idx = 0;
     for (size_t i = 0; i < size; ++i)
         idx = next[idx];
@@ -225,11 +226,22 @@ void benchmark::pointer_chase_benchmark(size_t size) {
 }
 
 void benchmark::cache_latency_benchmark(size_t size, size_t stride) {
+    if (size == 0) {
+        return;
+    }
+
     std::vector<size_t> data(size);
 
-    // Initialize a simple linked list with a fixed stride
+    size_t effective_stride = stride % size;
+    if (effective_stride == 0) {
+        effective_stride = 1;
+    }
+    while (std::gcd(effective_stride, size) != 1) {
+        ++effective_stride;
+    }
+
     for (size_t i = 0; i < size; ++i)
-        data[i] = (i + stride) % size;
+        data[i] = (i + effective_stride) % size;
 
     size_t idx = 0;
     volatile size_t sink = 0;
