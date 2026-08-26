@@ -3,6 +3,7 @@
 #include <iostream>
 #include <sstream>
 #include <cctype>
+#include <cmath>
 #include <stdexcept>
 #include "file_manager.hpp"
 
@@ -94,6 +95,23 @@ void parse_arguments::parse(int argc, char* argv[]) {
             }
         }
 
+        const Settings& parsed_settings = *settings_;
+        if (parsed_settings.thread_count <= 0 || parsed_settings.iterations <= 0 ||
+            parsed_settings.intensity_multiplier <= 0 || parsed_settings.matrix_multiply_size <= 0 ||
+            parsed_settings.repeat_count <= 0 || parsed_settings.num_runs <= 0) {
+            throw std::invalid_argument("threads, iterations, repeat, numRuns, intensityMultiplier, and matrixMultiplySize must be positive");
+        }
+        for (const auto& [name, value] : parsed_settings.weights) {
+            if (!std::isfinite(value) || value < 0.0) {
+                throw std::invalid_argument("Weight for '" + name + "' must be finite and non-negative");
+            }
+        }
+        for (const auto& [name, value] : parsed_settings.baseline_times) {
+            if (!std::isfinite(value) || value <= 0.0) {
+                throw std::invalid_argument("Baseline time for '" + name + "' must be finite and positive");
+            }
+        }
+
         // Determine mode
         if (vm.count("singleThreaded"))
            settings_.get()->mode = mode::single_threaded;
@@ -104,5 +122,6 @@ void parse_arguments::parse(int argc, char* argv[]) {
 
     } catch(const std::exception& e){
         std::cerr << "Argument parsing error: " << e.what() << "\n";
+        settings_->mode = mode::invalid;
     }
 }

@@ -32,18 +32,19 @@ void benchmark_coordinator::run_benchmark(runner_function runner)
     report_.add_score(scores);
 }
 
-void benchmark_coordinator::run_specific_benchmarks(const std::vector<std::string>& benchmark_names){
+std::vector<score> benchmark_coordinator::run_specific_benchmarks(
+    const std::vector<std::string>& benchmark_names, int num_threads, int iterations_per_thread) {
     scorer scorer;
     scorer.load_weights(std::make_shared<std::unordered_map<std::string, double>>(settings_.get()->weights));
     scorer.load_baseline_times(std::make_shared<std::unordered_map<std::string, double>>(settings_.get()->baseline_times));
     
-    int num_threads = settings_.get()->thread_count;
-    int iterations_per_thread = settings_.get()->iterations;
     int intensity_multiplier = settings_.get()->intensity_multiplier;
     int matrix_multiply_size = settings_.get()->matrix_multiply_size;
     int num_runs = settings_.get()->num_runs;
 
+    iterations_per_thread *= intensity_multiplier;
     benchmark_thread_pool pool(num_threads);
+    double total_time = 0.0;
 
     for (const auto& benchmark_name : benchmark_names) {
         std::cout << "\n=== Running benchmark: " << benchmark_name << " ===\n";
@@ -159,12 +160,13 @@ void benchmark_coordinator::run_specific_benchmarks(const std::vector<std::strin
             continue;
         }
 
+        total_time += elapsed;
         std::cout << "Benchmark score: " << scorer.compute_final_score() << "\n";
     }
 
-    double total_time = 0.0;
     const std::string thread_label = (num_threads > 1) ? "multi-threaded" : "single-threaded";
     std::cout << "\nTotal " << thread_label << " benchmark time: " << total_time << " seconds.\n";
+    return scorer.get_scores();
 }
 
 void benchmark_coordinator::start(const mode& mode)
@@ -243,13 +245,14 @@ void benchmark_coordinator::start_with_profile(const std::vector<std::string>& b
     {
         case mode::single_threaded:
         {
-            run_specific_benchmarks(benchmark_names);
+            report_.add_score(run_specific_benchmarks(benchmark_names, 1, settings_->iterations));
             break;
         }
 
         case mode::multi_threaded:
         {
-            run_specific_benchmarks(benchmark_names);
+            const int iterations_per_thread = settings_->iterations / settings_->thread_count;
+            report_.add_score(run_specific_benchmarks(benchmark_names, settings_->thread_count, iterations_per_thread));
             break;
         }
 
@@ -258,11 +261,12 @@ void benchmark_coordinator::start_with_profile(const std::vector<std::string>& b
         {
             // Run single-threaded first
             std::cout << "\n=== Single-threaded Mode ===\n";
-            run_specific_benchmarks(benchmark_names);
+            report_.add_score(run_specific_benchmarks(benchmark_names, 1, settings_->iterations));
 
             // Run multi-threaded
             std::cout << "\n=== Multi-threaded Mode ===\n";
-            run_specific_benchmarks(benchmark_names);
+            const int iterations_per_thread = settings_->iterations / settings_->thread_count;
+            report_.add_score(run_specific_benchmarks(benchmark_names, settings_->thread_count, iterations_per_thread));
             break;
         }
     }

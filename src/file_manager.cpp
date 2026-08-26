@@ -109,7 +109,7 @@ bool file_manager::write_json(const benchmark_report& report, const std::string&
         return false;
     }
 
-    const std::string file_path = save_folder + "/" + get_timestamped_file("scores", "json");
+    const std::string file_path = save_folder + "/" + get_timestamped_file("scores", ".json");
 
     try{
         json j;
@@ -167,15 +167,21 @@ bool file_manager::read_profile_txt(const std::string& path, benchmark_profile& 
                 continue;
             }
 
-            std::istringstream iss(line);
             std::string key;
             std::string value;
-
-            if (iss >> key) {
+            const std::size_t separator = line.find('=');
+            if (separator != std::string::npos) {
+                key = line.substr(0, separator);
+                value = line.substr(separator + 1);
+            } else {
+                std::istringstream iss(line);
+                iss >> key >> value;
+            }
+            if (!key.empty()) {
                 if (key == "benchmarks") {
                     // Read comma-separated benchmark names
                     std::string benchmarks_str;
-                    if (iss >> value) {
+                    if (!value.empty()) {
                         benchmarks_str = value;
                         std::stringstream ss(benchmarks_str);
                         std::string benchmark;
@@ -193,27 +199,27 @@ bool file_manager::read_profile_txt(const std::string& path, benchmark_profile& 
                         }
                     }
                 } else if (key == "iterations") {
-                    if (iss >> value) {
+                    if (!value.empty()) {
                         profile.iterations = std::stoi(value);
                     }
                 } else if (key == "repeat_count") {
-                    if (iss >> value) {
+                    if (!value.empty()) {
                         profile.repeat_count = std::stoi(value);
                     }
                 } else if (key == "intensity_multiplier") {
-                    if (iss >> value) {
+                    if (!value.empty()) {
                         profile.intensity_multiplier = std::stoi(value);
                     }
                 } else if (key == "matrix_multiply_size") {
-                    if (iss >> value) {
+                    if (!value.empty()) {
                         profile.matrix_multiply_size = std::stoi(value);
                     }
                 } else if (key == "num_runs") {
-                    if (iss >> value) {
+                    if (!value.empty()) {
                         profile.num_runs = std::stoi(value);
                     }
                 } else if (key == "name") {
-                    if (iss >> value) {
+                    if (!value.empty()) {
                         profile.name = value;
                     }
                 }
@@ -278,6 +284,11 @@ void file_manager::load_profile(const std::string& profile_path){
     if (read_profile_txt(profile_path, temp_profile)) {
         // Apply profile settings to current settings
         settings_.get()->profile = temp_profile;
+        settings_.get()->iterations = temp_profile.iterations;
+        settings_.get()->repeat_count = temp_profile.repeat_count;
+        settings_.get()->intensity_multiplier = temp_profile.intensity_multiplier;
+        settings_.get()->matrix_multiply_size = temp_profile.matrix_multiply_size;
+        settings_.get()->num_runs = temp_profile.num_runs;
         std::cout << "Profile loaded: " << profile_path << "\n";
         std::cout << "  Profile Name: " << temp_profile.name << "\n";
         std::cout << "  Benchmarks: ";

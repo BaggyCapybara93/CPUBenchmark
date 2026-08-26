@@ -44,7 +44,8 @@ struct Settings{
             {"matrix_multiply", 0.20},
             {"n_body", 0.15},
             {"memory_bandwidth", 0.10},
-            {"pointer_chase", 0.10}
+            {"pointer_chase", 0.10},
+            {"cache_latency", 0.10}
         };
 
     std::unordered_map<std::string, double> baseline_times = {
@@ -56,6 +57,7 @@ struct Settings{
             {"n_body", 0.030},
             {"memory_bandwidth", 0.025},
             {"pointer_chase", 0.020},
+            {"cache_latency", 0.020},
             {"combined", 0.150}
     };
 
