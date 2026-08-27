@@ -1,0 +1,7 @@
+name=quick_test
+benchmarks=floating_point,integer_arithmetic
+iterations=200
+repeat_count=3
+intensity_multiplier=2
+matrix_multiply_size=16
+num_runs=4

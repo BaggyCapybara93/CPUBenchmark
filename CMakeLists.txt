@@ -33,3 +33,21 @@ target_include_directories(CPUBenchmark PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/incl
 
 target_include_directories(CPUBenchmark PRIVATE ${Boost_INCLUDE_DIRS})
 target_link_libraries(CPUBenchmark PRIVATE Boost::program_options nlohmann_json::nlohmann_json)
+
+include(CTest)
+
+if(BUILD_TESTING)
+    add_executable(CPUBenchmarkTests
+        tests/test_main.cpp
+        src/scorer.cpp
+        src/benchmark_report.cpp
+        src/file_manager.cpp
+    )
+    target_include_directories(CPUBenchmarkTests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
+    target_link_libraries(CPUBenchmarkTests PRIVATE nlohmann_json::nlohmann_json)
+
+    add_test(
+        NAME CPUBenchmarkTests
+        COMMAND CPUBenchmarkTests ${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/quick_profile.txt
+    )
+endif()
