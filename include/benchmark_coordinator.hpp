@@ -10,6 +10,7 @@
 #include "benchmark_report.hpp"
 #include "file_manager.hpp"
 #include "settings.hpp"
+#include "thread_affinity.hpp"
 
 //Move this to a threading util file in the future
 class benchmark_thread_pool{
@@ -24,7 +25,7 @@ class benchmark_thread_pool{
         std::exception_ptr worker_exception_;
         std::mutex worker_exception_mutex_;
 
-        void worker_loop();
+        void worker_loop(std::size_t worker_index);
     public:
         benchmark_thread_pool(int num_threads)
             :   num_threads_(num_threads),
@@ -33,7 +34,7 @@ class benchmark_thread_pool{
             {
                 workers_.reserve(static_cast<size_t>(num_threads));
                 for (int i = 0; i < num_threads_; ++i) {
-                    workers_.emplace_back([this]() { worker_loop(); });
+                    workers_.emplace_back([this, i]() { worker_loop(static_cast<std::size_t>(i)); });
                 }
             }
 

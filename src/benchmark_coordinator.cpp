@@ -20,7 +20,8 @@ void benchmark_thread_pool::run_all(const std::function<void()>& fn) {
     }
 }
 
-void benchmark_thread_pool::worker_loop() {
+void benchmark_thread_pool::worker_loop(std::size_t worker_index) {
+    (void)thread_affinity::pin_current_thread(worker_index);
     while (true) {
         start_barrier_.arrive_and_wait();
 
