@@ -50,6 +50,7 @@ void benchmark_coordinator::run_benchmark(runner_function runner)
 
 std::vector<score> benchmark_coordinator::run_specific_benchmarks(
     const std::vector<std::string>& benchmark_names, int num_threads, int iterations_per_thread) {
+    report_.set_active_thread_count(num_threads);
     scorer scorer;
     scorer.load_weights(settings_->weights);
     scorer.load_baseline_times(settings_->baseline_times);
@@ -275,6 +276,7 @@ void benchmark_coordinator::start_with_profile(const std::vector<std::string>& b
 }
 
 std::vector<score> benchmark_coordinator::run(const int num_threads, int iterations_per_thread, const int intensity_multiplier, const int matrix_multiply_size, const int num_runs) {
+    report_.set_active_thread_count(num_threads);
     scorer scorer;
     scorer.load_weights(settings_->weights);
     scorer.load_baseline_times(settings_->baseline_times);

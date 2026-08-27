@@ -72,9 +72,13 @@ void test_profile(const std::string& profile_path) {
 
 void test_report_combined_score() {
     benchmark_report report;
+    report.set_active_thread_count(4);
     report.add_score({score("alpha", 100.0, 1.0), score("Combined", 321.0, 0.0)});
     require(approximately_equal(report.get_combined_score(), 321.0),
             "reports must preserve the scorer's combined score");
+    require(!report.get_os_info().empty() && !report.get_compiler_info().empty() &&
+                report.get_active_thread_count() == 4,
+            "reports must expose system metadata");
 }
 
 }  // namespace

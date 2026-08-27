@@ -1,5 +1,6 @@
 #include "benchmark_report.hpp"
 #include <string> 
+#include <cstdint>
 #include <cstring> 
 #include <iostream>
 #include <fstream>
@@ -7,6 +8,7 @@
 #include <numeric>
 #include <algorithm>
 #include <sstream>
+#include <thread>
 
 #if defined(_WIN32)
 #include <intrin.h>
@@ -142,10 +144,70 @@ std::string benchmark_report::collect_ram_info() {
     return ram_info;
 }
 
+std::string benchmark_report::collect_os_info() {
+#if defined(_WIN32)
+    return "Windows";
+#elif defined(__APPLE__)
+    return "macOS";
+#elif defined(__linux__)
+    return "Linux";
+#else
+    return "Unknown OS";
+#endif
+}
+
+std::string benchmark_report::collect_compiler_info() {
+#if defined(__clang__)
+    return "Clang " + std::to_string(__clang_major__) + "." + std::to_string(__clang_minor__);
+#elif defined(__GNUC__)
+    return "GCC " + std::to_string(__GNUC__) + "." + std::to_string(__GNUC_MINOR__);
+#elif defined(_MSC_VER)
+    return "MSVC " + std::to_string(_MSC_VER);
+#else
+    return "Unknown compiler";
+#endif
+}
+
+std::string benchmark_report::collect_cpu_frequency_info() {
+#if defined(__APPLE__)
+    std::uint64_t frequency_hz = 0;
+    size_t size = sizeof(frequency_hz);
+    if (sysctlbyname("hw.cpufrequency", &frequency_hz, &size, nullptr, 0) == 0 && frequency_hz > 0) {
+        const double frequency_ghz = static_cast<double>(frequency_hz) / 1'000'000'000.0;
+        std::ostringstream stream;
+        stream << std::fixed << std::setprecision(2) << frequency_ghz << " GHz";
+        return stream.str();
+    }
+#elif defined(__linux__)
+    std::ifstream cpuinfo("/proc/cpuinfo");
+    std::string line;
+    while (std::getline(cpuinfo, line)) {
+        if (line.find("cpu MHz") == 0) {
+            const std::size_t separator = line.find(':');
+            if (separator != std::string::npos) {
+                try {
+                    const double frequency_mhz = std::stod(line.substr(separator + 1));
+                    std::ostringstream stream;
+                    stream << std::fixed << std::setprecision(2) << frequency_mhz / 1000.0 << " GHz";
+                    return stream.str();
+                } catch (const std::exception&) {
+                    break;
+                }
+            }
+        }
+    }
+#endif
+    return "Unavailable";
+}
+
 // Constructor
 benchmark_report::benchmark_report() {
     cpuname = collect_cpu_name();
     ram_info = collect_ram_info();
+    os_info = collect_os_info();
+    compiler_info = collect_compiler_info();
+    cpu_frequency_info = collect_cpu_frequency_info();
+    logical_cpu_cores_ = std::thread::hardware_concurrency();
 }
 
 // Getters
