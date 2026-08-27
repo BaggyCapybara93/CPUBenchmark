@@ -63,8 +63,8 @@ private:
 
 public:
 
-    // Add a raw score (elapsed time)
-    void add_score(const std::string& benchmark_name, const double& raw_score, const double& time);
+    // Add one measured benchmark time.
+    void add_score(const std::string& benchmark_name, double elapsed_time);
 
     // Clear all stored scores
     void clear_scores();
@@ -72,16 +72,16 @@ public:
     double process_score(const std::string& benchmark_name, const double& elapsed_time);
 
     // Load custom weights
-    void load_weights(std::shared_ptr<std::unordered_map<std::string, double>> new_weights);
+    void load_weights(const std::unordered_map<std::string, double>& new_weights);
 
     // Load custom baseline times
-    void load_baseline_times(std::shared_ptr<std::unordered_map<std::string, double>> new_baseline_times);
+    void load_baseline_times(const std::unordered_map<std::string, double>& new_baseline_times);
 
     // Compute final weighted score
     double compute_final_score();
 
     //Get the score for each specific method
-    const std::vector<score>& get_scores();
+    std::vector<score> get_scores() const;
     
     // Add multiple scores at once (for batch processing)
     void add_scores(const std::vector<std::pair<std::string, double>>& benchmark_times);

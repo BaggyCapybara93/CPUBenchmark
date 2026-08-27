@@ -122,6 +122,7 @@ bool file_manager::write_json(const benchmark_report& report, const std::string&
         // Serialize scores with statistics
         j["scores"] = json::array();
         for (const auto& s : report.get_benchmark_scores()) {
+            if (s.benchmark_name_ == "Combined") continue;
             auto stats = report.get_stats(s.benchmark_name_);
             
             j["scores"].push_back({

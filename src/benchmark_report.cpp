@@ -159,17 +159,26 @@ double benchmark_report::get_combined_score() const {
         int count = 0;
 
         for (const auto& s : benchmark_scores_) {
-            if (s.benchmark_name_ == "Combined")
-                continue; // skip the synthetic entry
+            if (s.benchmark_name_ == "Combined") {
+                total += s.score_;
+                ++count;
+            }
+        }
 
-            total += s.score_;
-            count++;
+        if (count == 0)
+        {
+            for (const auto& s : benchmark_scores_) {
+                if (s.benchmark_name_ != "Combined") {
+                    total += s.score_;
+                    ++count;
+                }
+            }
         }
 
         if (count == 0)
             return 0.0;
 
-        return total / count; 
+        return total / static_cast<double>(count);
     } catch (const std::exception& e) {
         std::cerr << "Error calculating combined score: " << e.what() << "\n";
         return 0.0;
