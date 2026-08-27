@@ -187,64 +187,49 @@ std::vector<score> benchmark_coordinator::run_specific_benchmarks(
 
 void benchmark_coordinator::start(const mode& mode)
 {
-    switch (mode)
-    {
-        case mode::single_threaded:
-        {
-            run_benchmark([&](benchmark_coordinator& b) {
-                return b.run(
-                    1,  // num_threads
-                    settings_.get()->iterations,
-                    settings_.get()->intensity_multiplier,
-                    settings_.get()->matrix_multiply_size,
-                    settings_.get()->num_runs
-                );
-            });
-            break;
+    for (int repeat = 0; repeat < settings_->repeat_count; ++repeat) {
+        if (settings_->repeat_count > 1) {
+            std::cout << "\n=== Suite repetition " << (repeat + 1) << " of "
+                      << settings_->repeat_count << " ===\n";
         }
 
-        case mode::multi_threaded:
+        switch (mode)
         {
-            run_benchmark([&](benchmark_coordinator& b) {
-                int iterations_per_thread = settings_.get()->iterations / settings_.get()->thread_count;
-                return b.run(
-                    settings_.get()->thread_count,
-                    iterations_per_thread,
-                    settings_.get()->intensity_multiplier,
-                    settings_.get()->matrix_multiply_size,
-                    settings_.get()->num_runs
-                );
-            });
-            break;
-        }
+            case mode::single_threaded:
+            {
+                run_benchmark([&](benchmark_coordinator& b) {
+                    return b.run(1, settings_->iterations, settings_->intensity_multiplier,
+                                 settings_->matrix_multiply_size, settings_->num_runs);
+                });
+                break;
+            }
 
-        case mode::both:
-        default:
-        {
-            // Run single-threaded
-            run_benchmark([&](benchmark_coordinator& b) {
-                return b.run(
-                    1,  // num_threads
-                    settings_.get()->iterations,
-                    settings_.get()->intensity_multiplier,
-                    settings_.get()->matrix_multiply_size,
-                    settings_.get()->num_runs
-                );
-            });
+            case mode::multi_threaded:
+            {
+                run_benchmark([&](benchmark_coordinator& b) {
+                    const int iterations_per_thread = settings_->iterations / settings_->thread_count;
+                    return b.run(settings_->thread_count, iterations_per_thread,
+                                 settings_->intensity_multiplier, settings_->matrix_multiply_size,
+                                 settings_->num_runs);
+                });
+                break;
+            }
 
-            // Run multi-threaded
-            run_benchmark([&](benchmark_coordinator& b) {
-                int iterations_per_thread = settings_.get()->iterations / settings_.get()->thread_count;
-                return b.run(
-                    settings_.get()->thread_count,
-                    iterations_per_thread,
-                    settings_.get()->intensity_multiplier,
-                    settings_.get()->matrix_multiply_size,
-                    settings_.get()->num_runs
-                );
-            });
-
-            break;
+            case mode::both:
+            default:
+            {
+                run_benchmark([&](benchmark_coordinator& b) {
+                    return b.run(1, settings_->iterations, settings_->intensity_multiplier,
+                                 settings_->matrix_multiply_size, settings_->num_runs);
+                });
+                run_benchmark([&](benchmark_coordinator& b) {
+                    const int iterations_per_thread = settings_->iterations / settings_->thread_count;
+                    return b.run(settings_->thread_count, iterations_per_thread,
+                                 settings_->intensity_multiplier, settings_->matrix_multiply_size,
+                                 settings_->num_runs);
+                });
+                break;
+            }
         }
     }
 }
@@ -257,33 +242,38 @@ void benchmark_coordinator::start_with_profile(const std::vector<std::string>& b
 
     std::cout << "Running " << benchmark_names.size() << " benchmarks from profile...\n";
 
-    switch (mode)
-    {
-        case mode::single_threaded:
-        {
-            report_.add_score(run_specific_benchmarks(benchmark_names, 1, settings_->iterations));
-            break;
+    for (int repeat = 0; repeat < settings_->repeat_count; ++repeat) {
+        if (settings_->repeat_count > 1) {
+            std::cout << "\n=== Profile repetition " << (repeat + 1) << " of "
+                      << settings_->repeat_count << " ===\n";
         }
 
-        case mode::multi_threaded:
+        switch (mode)
         {
-            const int iterations_per_thread = settings_->iterations / settings_->thread_count;
-            report_.add_score(run_specific_benchmarks(benchmark_names, settings_->thread_count, iterations_per_thread));
-            break;
-        }
+            case mode::single_threaded:
+            {
+                report_.add_score(run_specific_benchmarks(benchmark_names, 1, settings_->iterations));
+                break;
+            }
 
-        case mode::both:
-        default:
-        {
-            // Run single-threaded first
-            std::cout << "\n=== Single-threaded Mode ===\n";
-            report_.add_score(run_specific_benchmarks(benchmark_names, 1, settings_->iterations));
+            case mode::multi_threaded:
+            {
+                const int iterations_per_thread = settings_->iterations / settings_->thread_count;
+                report_.add_score(run_specific_benchmarks(benchmark_names, settings_->thread_count, iterations_per_thread));
+                break;
+            }
 
-            // Run multi-threaded
-            std::cout << "\n=== Multi-threaded Mode ===\n";
-            const int iterations_per_thread = settings_->iterations / settings_->thread_count;
-            report_.add_score(run_specific_benchmarks(benchmark_names, settings_->thread_count, iterations_per_thread));
-            break;
+            case mode::both:
+            default:
+            {
+                std::cout << "\n=== Single-threaded Mode ===\n";
+                report_.add_score(run_specific_benchmarks(benchmark_names, 1, settings_->iterations));
+
+                std::cout << "\n=== Multi-threaded Mode ===\n";
+                const int iterations_per_thread = settings_->iterations / settings_->thread_count;
+                report_.add_score(run_specific_benchmarks(benchmark_names, settings_->thread_count, iterations_per_thread));
+                break;
+            }
         }
     }
 }
