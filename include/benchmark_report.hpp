@@ -48,7 +48,8 @@ class benchmark_report{
         void compute_all_statistics();
         
         // Compare with previous benchmark runs
-        bool compare_with_previous(const std::string& save_folder, const std::string& mode_type) const;
+        bool compare_with_previous(const std::string& save_folder, const std::string& mode_type,
+                                   const std::string& current_report_file) const;
         
         // Check if CPU and RAM are similar between runs
         static bool are_systems_similar(const std::string& cpu1, const std::string& ram1, 

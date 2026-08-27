@@ -95,7 +95,7 @@ bool file_manager::write_txt(const benchmark_report& report, const std::string& 
         } else {
             mode_str = "both";
         }
-        report.compare_with_previous(save_folder, mode_str);
+        report.compare_with_previous(save_folder, mode_str, fullPath.string());
         
         return true;
     } catch (const std::exception& e) {

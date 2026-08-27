@@ -371,7 +371,8 @@ bool benchmark_report::are_systems_similar(const std::string& cpu1, const std::s
 }
 
 // Compare with previous benchmark runs
-bool benchmark_report::compare_with_previous(const std::string& save_folder, const std::string& mode_type) const {
+bool benchmark_report::compare_with_previous(const std::string& save_folder, const std::string& mode_type,
+                                             const std::string& current_report_file) const {
     try {
         std::vector<std::string> previous_files;
         
@@ -379,6 +380,10 @@ bool benchmark_report::compare_with_previous(const std::string& save_folder, con
         if (std::filesystem::exists(save_folder)) {
             for (const auto& entry : std::filesystem::directory_iterator(save_folder)) {
                 if (entry.is_regular_file()) {
+                    std::error_code ec;
+                    if (std::filesystem::equivalent(entry.path(), current_report_file, ec) && !ec) {
+                        continue;
+                    }
                     std::string filename = entry.path().filename().string();
                     // Match files that start with "benchmark_scores"
                     if (filename.find("benchmark_scores") != std::string::npos && 
@@ -422,16 +427,39 @@ bool benchmark_report::compare_with_previous(const std::string& save_folder, con
                 return false;
             }
             
-            // Read previous CPU and RAM info
+            // Read system information and the multi-line benchmark sections written by write_txt.
             std::string line;
             std::string prev_cpu = "Unknown";
             std::string prev_ram = "Unknown";
-            
+            std::map<std::string, std::vector<double>> prev_times;
+            std::map<std::string, std::vector<double>> prev_scores;
+            std::string candidate_name;
+            std::string current_benchmark;
+
             while (std::getline(prev_file_stream, line)) {
                 if (line.find("CPU:") == 0) {
                     prev_cpu = line.substr(4);
                 } else if (line.find("RAM:") == 0) {
                     prev_ram = line.substr(4);
+                } else if (line.find("Score: ") == 0 && !candidate_name.empty()) {
+                    try {
+                        prev_scores[candidate_name].push_back(std::stod(line.substr(7)));
+                        current_benchmark = candidate_name;
+                    } catch (const std::exception&) {
+                        current_benchmark.clear();
+                    }
+                } else if (line.find("Time (mean): ") == 0 && !current_benchmark.empty()) {
+                    try {
+                        prev_times[current_benchmark].push_back(std::stod(line.substr(13)));
+                    } catch (const std::exception&) {
+                        // Ignore malformed time fields while retaining other valid benchmark sections.
+                    }
+                } else if (!line.empty() && line.find("-") != 0 && line.find("=") != 0 &&
+                           line.find("Min:") != 0 && line.find("Max:") != 0 &&
+                           line.find("Std Dev:") != 0 && line.find("P95:") != 0 &&
+                           line.find("P99:") != 0 && line.find("Sample Count:") != 0 &&
+                           line.find("Note:") != 0 && line != "COMBINED SCORE") {
+                    candidate_name = line;
                 }
             }
             prev_file_stream.close();
@@ -451,45 +479,6 @@ bool benchmark_report::compare_with_previous(const std::string& save_folder, con
                 std::cout << "Skipping comparison (different hardware)\n\n";
                 return false;
             }
-            
-            // Parse previous benchmark scores
-            std::map<std::string, std::vector<double>> prev_times;
-            std::map<std::string, std::vector<double>> prev_scores;
-            
-            std::ifstream prev_file_stream2(latest_file);
-            std::string prev_line;
-            while (std::getline(prev_file_stream2, prev_line)) {
-                // Skip header lines
-                if (prev_line.find("CPU:") == 0 || prev_line.find("RAM:") == 0 ||
-                    prev_line.find("================================") == 0 ||
-                    prev_line.find("--------------------------------") == 0) {
-                    continue;
-                }
-                
-                // Parse benchmark line
-                std::istringstream iss(prev_line);
-                std::string name;
-                std::string score_str;
-                std::string time_str;
-                
-                if (iss >> name >> score_str >> time_str) {
-                    // Remove trailing info like "s" or "| Score: ..."
-                    if (time_str.back() == 's') {
-                        time_str.pop_back();
-                    }
-                    
-                    try {
-                        double time_val = std::stod(time_str);
-                        double score_val = std::stod(score_str);
-                        
-                        prev_times[name].push_back(time_val);
-                        prev_scores[name].push_back(score_val);
-                    } catch (...) {
-                        // Skip malformed lines
-                    }
-                }
-            }
-            prev_file_stream2.close();
             
             // Compare each benchmark
             std::cout << "Benchmark Comparison:\n";
