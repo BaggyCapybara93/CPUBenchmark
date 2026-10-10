@@ -1,4 +1,5 @@
 #include "benchmark_report.hpp"
+#include "timing_statistics.hpp"
 #include <string> 
 #include <cstdint>
 #include <cstring> 
@@ -9,6 +10,7 @@
 #include <algorithm>
 #include <sstream>
 #include <thread>
+#include <utility>
 
 #if defined(_WIN32)
 #include <intrin.h>
@@ -273,11 +275,9 @@ void benchmark_report::add_scores_with_stats(const std::vector<std::pair<std::st
         
         // Add scores
         for (auto& [name, times] : times_map) {
-            double normalized = 0.0;
-            if (!times.empty()) {
-                normalized = 2500.0 * 0.020 / times[0]; // Simplified normalization
-            }
-            new_scores.emplace_back(name, normalized, times[0]);
+            const timing_statistics stats = calculate_timing_statistics(times);
+            const double normalized = 2500.0 * 0.020 / stats.mean; // Simplified normalization
+            new_scores.emplace_back(name, normalized, stats.mean, std::move(times));
         }
         
         benchmark_scores_.insert(
@@ -292,100 +292,37 @@ void benchmark_report::add_scores_with_stats(const std::vector<std::pair<std::st
 
 // Compute statistics for all benchmarks
 void benchmark_report::compute_all_statistics() {
-    try {
-        std::map<std::string, std::vector<double>> times_map;
-        
-        // Collect all times by benchmark name
-        for (const auto& s : benchmark_scores_) {
-            times_map[s.benchmark_name_].push_back(s.time_);
+    for (auto& result : benchmark_scores_) {
+        if (result.benchmark_name_ == "Combined") {
+            continue;
         }
-        
-        // Compute statistics for each benchmark
-        for (auto& [name, times] : times_map) {
-            if (times.empty()) continue;
-            
-            std::sort(times.begin(), times.end());
-            
-            double min_t = times.front();
-            double max_t = times.back();
-            
-            // Standard deviation
-double mean = std::accumulate(times.begin(), times.end(), 0.0) / static_cast<double>(times.size());
-        double variance = 0.0;
-        for (double t : times) {
-            variance += (t - mean) * (t - mean);
-        }
-        double std_dev = std::sqrt(variance / static_cast<double>(times.size()));
-            
-            // P95 and P99
-            double p95_idx = 0.95 * static_cast<double>(times.size() - 1);
-            double p99_idx = 0.99 * static_cast<double>(times.size() - 1);
-            
-            size_t p95_idx_int = static_cast<size_t>(std::floor(p95_idx));
-            size_t p99_idx_int = static_cast<size_t>(std::floor(p99_idx));
-            
-            double p95 = times[p95_idx_int];
-            double p99 = times[p99_idx_int];
-            
-            // Update the first score entry
-            auto it = std::find_if(benchmark_scores_.begin(), benchmark_scores_.end(),
-                [&name](const score& s) { return s.benchmark_name_ == name; });
-            if (it != benchmark_scores_.end()) {
-                it->min_time_ = min_t;
-                it->max_time_ = max_t;
-                it->std_dev_ = std_dev;
-                it->p95_ = p95;
-                it->p99_ = p99;
-            }
-        }
-    } catch (const std::exception& e) {
-        std::cerr << "Error computing all statistics: " << e.what() << "\n";
+        const timing_statistics stats = calculate_timing_statistics(result.samples_);
+        result.min_time_ = stats.min;
+        result.max_time_ = stats.max;
+        result.std_dev_ = stats.std_dev;
+        result.median_time_ = stats.median;
+        result.p95_ = stats.p95;
+        result.p99_ = stats.p99;
     }
 }
 
 // Get statistics for a benchmark
 benchmark_report::benchmark_stats benchmark_report::get_stats(const std::string& benchmark_name) const {
-    benchmark_report::benchmark_stats stats = {0.0, 0.0, 0.0, 0.0, 0.0, 0};
-    
-    try {
-        std::vector<double> times;
-        for (const auto& s : benchmark_scores_) {
-            if (s.benchmark_name_ == benchmark_name) {
-                times.push_back(s.time_);
-            }
+    std::vector<double> times;
+    for (const auto& result : benchmark_scores_) {
+        if (result.benchmark_name_ == benchmark_name) {
+            times.insert(times.end(), result.samples_.begin(), result.samples_.end());
         }
-        
-        stats.count = static_cast<int>(times.size());
-        
-        if (times.empty()) {
-            return stats;
-        }
-        
-        std::sort(times.begin(), times.end());
-        
-        stats.min_time = times.front();
-        stats.max_time = times.back();
-        
-        double mean = std::accumulate(times.begin(), times.end(), 0.0) / static_cast<double>(times.size());
-        double variance = 0.0;
-        for (double t : times) {
-            variance += (t - mean) * (t - mean);
-        }
-        stats.std_dev = std::sqrt(variance / static_cast<double>(times.size()));
-        
-        double p95_idx = 0.95 * static_cast<double>(times.size() - 1);
-        double p99_idx = 0.99 * static_cast<double>(times.size() - 1);
-        
-        size_t p95_idx_int = static_cast<size_t>(std::floor(p95_idx));
-        size_t p99_idx_int = static_cast<size_t>(std::floor(p99_idx));
-        
-        stats.p95 = times[p95_idx_int];
-        stats.p99 = times[p99_idx_int];
-    } catch (const std::exception& e) {
-        std::cerr << "Error getting stats: " << e.what() << "\n";
     }
-    
-    return stats;
+    const timing_statistics stats = calculate_timing_statistics(std::move(times));
+    return {stats.min, stats.max, stats.std_dev, stats.median, stats.p95, stats.p99,
+            static_cast<int>(stats.count)};
+}
+
+benchmark_report::benchmark_stats benchmark_report::get_stats(const score& result) {
+    const timing_statistics stats = calculate_timing_statistics(result.samples_);
+    return {stats.min, stats.max, stats.std_dev, stats.median, stats.p95, stats.p99,
+            static_cast<int>(stats.count)};
 }
 
 // Check if CPU and RAM are similar between runs
@@ -520,7 +457,9 @@ bool benchmark_report::compare_with_previous(const std::string& save_folder, con
                         // Ignore malformed time fields while retaining other valid benchmark sections.
                     }
                 } else if (!line.empty() && line.find("-") != 0 && line.find("=") != 0 &&
+                           line.find("Suite Repetition:") != 0 &&
                            line.find("Min:") != 0 && line.find("Max:") != 0 &&
+                           line.find("Median:") != 0 &&
                            line.find("Std Dev:") != 0 && line.find("P95:") != 0 &&
                            line.find("P99:") != 0 && line.find("Sample Count:") != 0 &&
                            line.find("Note:") != 0 && line != "COMBINED SCORE") {

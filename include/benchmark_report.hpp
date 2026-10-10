@@ -47,12 +47,14 @@ class benchmark_report{
             double min_time;
             double max_time;
             double std_dev;
+        double median_time;
             double p95;
             double p99;
             int count;
         };
         
         benchmark_stats get_stats(const std::string& benchmark_name) const;
+        static benchmark_stats get_stats(const score& result);
 
         //Add score
         void add_score(const std::vector<score>& benchmarks);

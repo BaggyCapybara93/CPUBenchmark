@@ -65,7 +65,7 @@ public:
 
     // Run setup before every warmup and sample, outside the timed interval.
     template <typename Function, typename Setup>
-    static double run_benchmark(Function&& func, int num_runs, Setup&& setup){
+    static std::vector<double> run_benchmark(Function&& func, int num_runs, Setup&& setup){
         if (num_runs <= 0) {
             throw std::invalid_argument("Number of runs must be positive.");
         }
@@ -79,6 +79,7 @@ public:
 
         // Measurement
         std::vector<double> run_times;
+        run_times.reserve(static_cast<std::size_t>(num_runs));
         
         for (int i = 0; i < num_runs; ++i) {
             std::invoke(setup);
@@ -86,14 +87,11 @@ public:
             run_times.push_back(duration);
         }
 
-        // Calculation
-        double total_time = std::accumulate(run_times.begin(), run_times.end(), 0.0);
-        
-        return total_time / num_runs; // Returns the average 
+        return run_times;
     }
 
     template <typename Function>
-    static double run_benchmark(Function&& func, int num_runs){
+    static std::vector<double> run_benchmark(Function&& func, int num_runs){
         return run_benchmark(std::forward<Function>(func), num_runs, [] {});
     }
 

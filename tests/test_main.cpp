@@ -1,3 +1,4 @@
+#include "benchmark.hpp"
 #include "benchmark_report.hpp"
 #include "file_manager.hpp"
 #include "scorer.hpp"
@@ -59,6 +60,46 @@ void test_scorer() {
     require(rejected_invalid_time, "the scorer must reject non-positive elapsed times");
 }
 
+void test_run_samples_and_statistics() {
+    int setups = 0;
+    int executions = 0;
+    const auto samples = benchmark::run_benchmark(
+        [&]() {
+            require(setups == executions + 1, "each run must receive setup before execution");
+            ++executions;
+        },
+        4,
+        [&]() { ++setups; });
+    require(samples.size() == 4 && setups == 9 && executions == 9,
+            "warmups must be excluded from measured samples");
+
+    scorer measured;
+    measured.load_weights({{"alpha", 1.0}});
+    measured.load_baseline_times({{"alpha", 2.0}});
+    const double mean = measured.add_score("alpha", {1.0, 2.0, 3.0, 4.0});
+    require(approximately_equal(mean, 2.5), "mean must use every measured run");
+    const auto scores = measured.get_scores();
+    require(scores.size() == 1 && scores.front().samples_.size() == 4,
+            "scores must retain every measured run");
+    require(approximately_equal(scores.front().score_, 2000.0),
+            "scores must use the mean of measured runs");
+
+    benchmark_report report;
+    report.add_score({scores.front(), score("Combined", measured.compute_final_score(), 0.0)});
+    const auto stats = report.get_stats(scores.front());
+    require(stats.count == 4 && approximately_equal(stats.min_time, 1.0) &&
+                approximately_equal(stats.max_time, 4.0) &&
+                approximately_equal(stats.median_time, 2.5) &&
+                approximately_equal(stats.std_dev, std::sqrt(1.25)) &&
+                approximately_equal(stats.p95, 3.85) && approximately_equal(stats.p99, 3.97),
+            "report statistics must describe measured samples");
+
+    report.add_score({score("alpha", 2500.0, 2.0, {1.0, 3.0})});
+    const auto across_repetitions = report.get_stats("alpha");
+    require(across_repetitions.count == 6 && approximately_equal(across_repetitions.median_time, 2.5),
+            "aggregate statistics must include samples from every suite repetition");
+}
+
 void test_profile(const std::string& profile_path) {
     auto settings = std::make_shared<Settings>();
     file_manager manager(settings);
@@ -87,6 +128,7 @@ int main(int argc, char* argv[]) {
     try {
         require(argc == 2, "expected a profile fixture path");
         test_scorer();
+        test_run_samples_and_statistics();
         test_profile(argv[1]);
         test_report_combined_score();
         return EXIT_SUCCESS;

@@ -25,6 +25,8 @@ make
 
 Sorting, memory bandwidth, and pointer chasing prepare their inputs before timing. Sorting restores the same input before each warmup and measured run. Timings use a monotonic clock and include worker dispatch overhead. Reports carry a measurement version; comparisons skip older results when the measurement method changes.
 
+`numRuns` controls the number of timed samples per benchmark and suite repetition. Reports show their mean, median, min, max, standard deviation, P95, and P99; JSON reports also include every raw run time. Warmup runs are excluded from these statistics.
+
 ### Basic Usage
 ```bash
 # Run both single-threaded and multi-threaded benchmarks

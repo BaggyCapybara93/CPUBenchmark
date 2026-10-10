@@ -4,6 +4,7 @@ using json = nlohmann::json;
 namespace fs = std::filesystem;
 
 #include <iomanip>
+#include <unordered_map>
 
 
 void file_manager::save_report(const benchmark_report& report, const std::string& save_folder) const{
@@ -62,20 +63,34 @@ bool file_manager::write_txt(const benchmark_report& report, const std::string& 
         file << "Measurement Version: " << benchmark_report::measurement_version << "\n";
         file << "==========================================\n\n";
 
-        // Compute and write statistics for each benchmark
+        std::unordered_map<std::string, int> repetition_counts;
+        for (const auto& s : report.get_benchmark_scores()) {
+            if (s.benchmark_name_ != "Combined") {
+                ++repetition_counts[s.benchmark_name_];
+            }
+        }
+        std::unordered_map<std::string, int> repetition_indices;
+
+        // Compute and write statistics for each suite repetition.
         for (const auto& s : report.get_benchmark_scores()) {
             if (s.benchmark_name_ == "Combined") continue;
             
-            auto stats = report.get_stats(s.benchmark_name_);
+            auto stats = report.get_stats(s);
+            const int repetition = ++repetition_indices[s.benchmark_name_];
             
             file << "------------------------------------------\n";
             file << s.benchmark_name_ << "\n";
             file << "------------------------------------------\n";
+            if (repetition_counts.at(s.benchmark_name_) > 1) {
+                file << "Suite Repetition: " << repetition << " of "
+                     << repetition_counts.at(s.benchmark_name_) << "\n";
+            }
             file << "Score: " << std::fixed << std::setprecision(2) << s.score_ << "\n";
-            file << "Time (mean): " << std::fixed << std::setprecision(6) << s.time_ << "s\n";
+            file << "Time (mean): " << std::fixed << std::setprecision(9) << s.time_ << "s\n";
             file << "Min: " << stats.min_time << "s\n";
             file << "Max: " << stats.max_time << "s\n";
-            file << "Std Dev: " << std::fixed << std::setprecision(6) << stats.std_dev << "s\n";
+            file << "Median: " << stats.median_time << "s\n";
+            file << "Std Dev: " << std::fixed << std::setprecision(9) << stats.std_dev << "s\n";
             file << "P95: " << stats.p95 << "s\n";
             file << "P99: " << stats.p99 << "s\n";
             file << "Sample Count: " << stats.count << "\n";
@@ -135,16 +150,21 @@ bool file_manager::write_json(const benchmark_report& report, const std::string&
 
         // Serialize scores with statistics
         j["scores"] = json::array();
+        std::unordered_map<std::string, int> repetition_indices;
         for (const auto& s : report.get_benchmark_scores()) {
             if (s.benchmark_name_ == "Combined") continue;
-            auto stats = report.get_stats(s.benchmark_name_);
+            auto stats = report.get_stats(s);
+            const int repetition = ++repetition_indices[s.benchmark_name_];
             
             j["scores"].push_back({
                 {"benchmarkName", s.benchmark_name_},
+                {"suiteRepetition", repetition},
                 {"score", s.score_},
                 {"time", s.time_},
+                {"runTimes", s.samples_},
                 {"minTime", stats.min_time},
                 {"maxTime", stats.max_time},
+                {"medianTime", stats.median_time},
                 {"stdDev", stats.std_dev},
                 {"p95", stats.p95},
                 {"p99", stats.p99},

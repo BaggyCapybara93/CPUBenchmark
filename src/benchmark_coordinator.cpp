@@ -91,9 +91,8 @@ std::vector<score> benchmark_coordinator::run_specific_benchmarks(
                     benchmark::floating_point_benchmark(iterations_per_thread);
                 });
             };
-            elapsed = benchmark::run_benchmark(float_runner, num_runs);
+            elapsed = scorer.add_score("floating_point", benchmark::run_benchmark(float_runner, num_runs));
             std::cout << "Floating-point benchmark completed in " << elapsed << " seconds.\n";
-            scorer.add_score("floating_point", elapsed);
         }
         else if (benchmark_name == "integer_arithmetic" || benchmark_name == "integer") {
             auto int_runner = [&]() {
@@ -101,9 +100,8 @@ std::vector<score> benchmark_coordinator::run_specific_benchmarks(
                     benchmark::integer_arithmetic_benchmark(iterations_per_thread);
                 });
             };
-            elapsed = benchmark::run_benchmark(int_runner, num_runs);
+            elapsed = scorer.add_score("integer", benchmark::run_benchmark(int_runner, num_runs));
             std::cout << "Integer arithmetic benchmark completed in " << elapsed << " seconds.\n";
-            scorer.add_score("integer", elapsed);
         }
         else if (benchmark_name == "matrix_multiply") {
             int actual_matrix_size = static_cast<int>(matrix_multiply_size * std::sqrt(static_cast<double>(intensity_multiplier)));
@@ -112,9 +110,8 @@ std::vector<score> benchmark_coordinator::run_specific_benchmarks(
                     benchmark::matrix_multiply_benchmark(actual_matrix_size);
                 });
             };
-            elapsed = benchmark::run_benchmark(matrix_runner, num_runs);
+            elapsed = scorer.add_score("matrix_multiply", benchmark::run_benchmark(matrix_runner, num_runs));
             std::cout << "Matrix multiply benchmark completed in " << elapsed << " seconds.\n";
-            scorer.add_score("matrix_multiply", elapsed);
         }
         else if (benchmark_name == "branch_prediction" || benchmark_name == "branch") {
             auto branch_runner = [&]() {
@@ -122,9 +119,8 @@ std::vector<score> benchmark_coordinator::run_specific_benchmarks(
                     benchmark::branch_prediction_benchmark(iterations_per_thread);
                 });
             };
-            elapsed = benchmark::run_benchmark(branch_runner, num_runs);
+            elapsed = scorer.add_score("branch", benchmark::run_benchmark(branch_runner, num_runs));
             std::cout << "Branch prediction benchmark completed in " << elapsed << " seconds.\n";
-            scorer.add_score("branch", elapsed);
         }
         else if (benchmark_name == "n_body") {
             int steps = 10;
@@ -134,9 +130,8 @@ std::vector<score> benchmark_coordinator::run_specific_benchmarks(
                     benchmark::n_body_benchmark(bodies, steps);
                 });
             };
-            elapsed = benchmark::run_benchmark(nbody_runner, num_runs);
+            elapsed = scorer.add_score("n_body", benchmark::run_benchmark(nbody_runner, num_runs));
             std::cout << "NBody benchmark completed in " << elapsed << " seconds.\n";
-            scorer.add_score("n_body", elapsed);
         }
         else if (benchmark_name == "sorting") {
             int sort_size = 50000 * static_cast<int>(std::sqrt(intensity_multiplier));
@@ -147,9 +142,8 @@ std::vector<score> benchmark_coordinator::run_specific_benchmarks(
             auto sort_runner = [&]() {
                 pool.run_all_indexed([&](std::size_t index) { workloads[index]->run(); });
             };
-            elapsed = benchmark::run_benchmark(sort_runner, num_runs, reset_sort);
+            elapsed = scorer.add_score("sorting", benchmark::run_benchmark(sort_runner, num_runs, reset_sort));
             std::cout << "Sorting benchmark completed in " << elapsed << " seconds.\n";
-            scorer.add_score("sorting", elapsed);
         }
         else if (benchmark_name == "memory_bandwidth") {
             std::size_t mem_size = static_cast<std::size_t>(iterations_per_thread) * 8;
@@ -157,9 +151,8 @@ std::vector<score> benchmark_coordinator::run_specific_benchmarks(
             auto memory_runner = [&]() {
                 pool.run_all_indexed([&](std::size_t index) { workloads[index]->run(); });
             };
-            elapsed = benchmark::run_benchmark(memory_runner, num_runs);
+            elapsed = scorer.add_score("memory_bandwidth", benchmark::run_benchmark(memory_runner, num_runs));
             std::cout << "Memory bandwidth benchmark completed in " << elapsed << " seconds.\n";
-            scorer.add_score("memory_bandwidth", elapsed);
         }
         else if (benchmark_name == "pointer_chase" || benchmark_name == "pointer") {
             std::size_t chase_size = static_cast<std::size_t>(iterations_per_thread);
@@ -167,9 +160,8 @@ std::vector<score> benchmark_coordinator::run_specific_benchmarks(
             auto pointer_chase_runner = [&]() {
                 pool.run_all_indexed([&](std::size_t index) { workloads[index]->run(); });
             };
-            elapsed = benchmark::run_benchmark(pointer_chase_runner, num_runs);
+            elapsed = scorer.add_score("pointer_chase", benchmark::run_benchmark(pointer_chase_runner, num_runs));
             std::cout << "Pointer chase benchmark completed in " << elapsed << " seconds.\n";
-            scorer.add_score("pointer_chase", elapsed);
         }
         else if (benchmark_name == "cache_latency" || benchmark_name == "cache") {
             std::size_t cache_size = static_cast<std::size_t>(iterations_per_thread);
@@ -179,9 +171,8 @@ std::vector<score> benchmark_coordinator::run_specific_benchmarks(
                     benchmark::cache_latency_benchmark(cache_size, cache_stride);
                 });
             };
-            elapsed = benchmark::run_benchmark(cache_latency_runner, num_runs);
+            elapsed = scorer.add_score("cache_latency", benchmark::run_benchmark(cache_latency_runner, num_runs));
             std::cout << "Cache latency benchmark completed in " << elapsed << " seconds.\n";
-            scorer.add_score("cache_latency", elapsed);
         }
         else {
             std::cerr << "Unknown benchmark: " << benchmark_name << "\n";
@@ -308,9 +299,8 @@ std::vector<score> benchmark_coordinator::run(const int num_threads, int iterati
         });
     };
 
-    double elapsed_float = benchmark::run_benchmark(float_runner, num_runs);
+    double elapsed_float = scorer.add_score("floating_point", benchmark::run_benchmark(float_runner, num_runs));
     std::cout << "Floating-point benchmark completed in " << elapsed_float << " seconds.\n";
-    scorer.add_score("floating_point", elapsed_float);
 
     // Integer arithmetic benchmark 
     auto int_runner = [&]() {
@@ -319,9 +309,8 @@ std::vector<score> benchmark_coordinator::run(const int num_threads, int iterati
         });
     };
 
-    double elapsed_int = benchmark::run_benchmark(int_runner, num_runs);
+    double elapsed_int = scorer.add_score("integer", benchmark::run_benchmark(int_runner, num_runs));
     std::cout << "Integer arithmetic benchmark completed in " << elapsed_int << " seconds.\n";
-    scorer.add_score("integer", elapsed_int);
 
     //Matrix Multiplication Benchmark
     int matrix_size = static_cast<int>(matrix_multiply_size * std::sqrt(static_cast<double>(intensity_multiplier)));
@@ -331,9 +320,8 @@ std::vector<score> benchmark_coordinator::run(const int num_threads, int iterati
         });
     };
 
-    double elapsed_matrix = benchmark::run_benchmark(matrix_runner, num_runs);
+    double elapsed_matrix = scorer.add_score("matrix_multiply", benchmark::run_benchmark(matrix_runner, num_runs));
     std::cout << "Matrix multiply benchmark completed in " << elapsed_matrix << " seconds.\n";
-    scorer.add_score("matrix_multiply", elapsed_matrix);
 
     //Branch Prediction Benchmark
     auto branch_runner = [&]() {
@@ -342,9 +330,8 @@ std::vector<score> benchmark_coordinator::run(const int num_threads, int iterati
         });
     };
 
-    double elapsed_branch = benchmark::run_benchmark(branch_runner, num_runs);
+    double elapsed_branch = scorer.add_score("branch", benchmark::run_benchmark(branch_runner, num_runs));
     std::cout << "Branch prediction benchmark completed in " << elapsed_branch << " seconds.\n";
-    scorer.add_score("branch", elapsed_branch);
 
     //Nbody Benchmark
     int steps = 10;
@@ -356,9 +343,8 @@ std::vector<score> benchmark_coordinator::run(const int num_threads, int iterati
         });
     };
 
-    double elapsed_nbody = benchmark::run_benchmark(nbody_runner, num_runs);
+    double elapsed_nbody = scorer.add_score("n_body", benchmark::run_benchmark(nbody_runner, num_runs));
     std::cout << "NBody benchmark completed in " << elapsed_nbody << " seconds.\n";
-    scorer.add_score("n_body", elapsed_nbody);
 
     //Sorting Benchmark
     double elapsed_sort = 0.0;
@@ -372,9 +358,8 @@ std::vector<score> benchmark_coordinator::run(const int num_threads, int iterati
             pool.run_all_indexed([&](std::size_t index) { sort_workloads[index]->run(); });
         };
 
-        elapsed_sort = benchmark::run_benchmark(sort_runner, num_runs, reset_sort);
+        elapsed_sort = scorer.add_score("sorting", benchmark::run_benchmark(sort_runner, num_runs, reset_sort));
         std::cout << "Sorting benchmark completed in " << elapsed_sort << " seconds.\n";
-        scorer.add_score("sorting", elapsed_sort);
     }
 
     // Memory Bandwidth Benchmark 
@@ -387,9 +372,8 @@ std::vector<score> benchmark_coordinator::run(const int num_threads, int iterati
             pool.run_all_indexed([&](std::size_t index) { memory_workloads[index]->run(); });
         };
 
-        elapsed_memory = benchmark::run_benchmark(memory_runner, num_runs);
+        elapsed_memory = scorer.add_score("memory_bandwidth", benchmark::run_benchmark(memory_runner, num_runs));
         std::cout << "Memory bandwidth benchmark completed in " << elapsed_memory << " seconds.\n";
-        scorer.add_score("memory_bandwidth", elapsed_memory);
     }
 
     // Pointer Chasing Benchmark
@@ -402,9 +386,8 @@ std::vector<score> benchmark_coordinator::run(const int num_threads, int iterati
             pool.run_all_indexed([&](std::size_t index) { pointer_workloads[index]->run(); });
         };
 
-        elapsed_chase = benchmark::run_benchmark(pointer_chase_runner, num_runs);
+        elapsed_chase = scorer.add_score("pointer_chase", benchmark::run_benchmark(pointer_chase_runner, num_runs));
         std::cout << "Pointer chase benchmark completed in " << elapsed_chase << " seconds.\n";
-        scorer.add_score("pointer_chase", elapsed_chase);
     }
 
     // Cache Latency Benchmark
@@ -417,12 +400,11 @@ std::vector<score> benchmark_coordinator::run(const int num_threads, int iterati
         });
     };
 
-    double elapsed_cache = benchmark::run_benchmark(cache_latency_runner, num_runs);
+    double elapsed_cache = scorer.add_score("cache_latency", benchmark::run_benchmark(cache_latency_runner, num_runs));
 
     std::cout << "Cache latency benchmark completed in "
             << elapsed_cache << " seconds.\n";
 
-    scorer.add_score("cache_latency", elapsed_cache);
 
     // Return total duration
     double total_time = elapsed_float + elapsed_int + elapsed_matrix + elapsed_branch + elapsed_nbody + elapsed_sort + elapsed_memory + elapsed_chase + elapsed_cache;

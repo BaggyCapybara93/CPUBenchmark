@@ -6,6 +6,7 @@
 #include <memory>
 #include <cmath>
 #include <mutex>
+#include <utility>
 
 struct score {
     std::string benchmark_name_;
@@ -16,16 +17,25 @@ struct score {
     double min_time_;
     double max_time_;
     double std_dev_;
+    double median_time_;
     double p95_;
     double p99_;
+    std::vector<double> samples_;
 
     score(const std::string& name, double s, double t)
         : benchmark_name_(name), score_(s), time_(t),
-          min_time_(t), max_time_(t), std_dev_(0.0), p95_(t), p99_(t) {}
+          min_time_(t), max_time_(t), std_dev_(0.0), median_time_(t),
+          p95_(t), p99_(t), samples_(t > 0.0 ? std::vector<double>{t} : std::vector<double>{}) {}
+
+    score(const std::string& name, double s, double t, std::vector<double> samples)
+        : benchmark_name_(name), score_(s), time_(t),
+          min_time_(t), max_time_(t), std_dev_(0.0), median_time_(t),
+          p95_(t), p99_(t), samples_(std::move(samples)) {}
     
     score(const std::string& name, double s, double t, double min_t, double max_t, double std_dev, double p95, double p99)
         : benchmark_name_(name), score_(s), time_(t),
-          min_time_(min_t), max_time_(max_t), std_dev_(std_dev), p95_(p95), p99_(p99) {}
+          min_time_(min_t), max_time_(max_t), std_dev_(std_dev), median_time_(t),
+          p95_(p95), p99_(p99), samples_(t > 0.0 ? std::vector<double>{t} : std::vector<double>{}) {}
 };
 
 class scorer {
@@ -65,6 +75,7 @@ public:
 
     // Add one measured benchmark time.
     void add_score(const std::string& benchmark_name, double elapsed_time);
+    double add_score(const std::string& benchmark_name, std::vector<double> run_times);
 
     // Clear all stored scores
     void clear_scores();
@@ -94,6 +105,7 @@ public:
         double min_time;
         double max_time;
         double std_dev;
+        double median_time;
         double p95;
         double p99;
         int count;
