@@ -25,6 +25,8 @@ class benchmark_report{
         static std::string collect_cpu_frequency_info();
 
     public:
+        static constexpr int measurement_version = 2;
+
         //Constructor
         benchmark_report();
 

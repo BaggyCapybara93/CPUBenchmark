@@ -6,11 +6,41 @@
 #include <thread>
 #include <functional>
 #include <numeric>
+#include <stdexcept>
+#include <utility>
 #include <vector>
 #include <unordered_map>
 
 class benchmark {
 public:
+    struct sorting_workload {
+        explicit sorting_workload(int size);
+        void reset();
+        void run();
+
+    private:
+        std::vector<int> input_;
+        std::vector<int> working_;
+    };
+
+    struct memory_bandwidth_workload {
+        explicit memory_bandwidth_workload(std::size_t size);
+        void run();
+
+    private:
+        std::vector<double> a_;
+        std::vector<double> b_;
+        std::vector<double> c_;
+    };
+
+    struct pointer_chase_workload {
+        explicit pointer_chase_workload(std::size_t size);
+        void run() const;
+
+    private:
+        std::vector<std::size_t> next_;
+    };
+
     static void integer_arithmetic_benchmark(int iterations);
     static void floating_point_benchmark(int iterations);
     static void matrix_multiply_benchmark(int iterations);
@@ -27,15 +57,15 @@ public:
     //Time
     template <typename Function, typename... Args>
     static double time(Function&& func, Args&& ... args){
-        auto start = std::chrono::high_resolution_clock::now();
+        auto start = std::chrono::steady_clock::now();
         std::invoke(std::forward<Function>(func), std::forward<Args>(args)...);
-        auto end = std::chrono::high_resolution_clock::now();
+        auto end = std::chrono::steady_clock::now();
         return std::chrono::duration<double>(end - start).count();
     }
 
-    //Runner
-    template <typename Function, typename... Args>
-    static double run_benchmark(Function&& func, Args&&... args, int num_runs){
+    // Run setup before every warmup and sample, outside the timed interval.
+    template <typename Function, typename Setup>
+    static double run_benchmark(Function&& func, int num_runs, Setup&& setup){
         if (num_runs <= 0) {
             throw std::invalid_argument("Number of runs must be positive.");
         }
@@ -43,14 +73,16 @@ public:
         //Warmup
         const int warmup_runs = 5;
         for (int i = 0; i < warmup_runs; ++i) {
-            benchmark::execute(func, args...);
+            std::invoke(setup);
+            benchmark::execute(func);
         }
 
         // Measurement
         std::vector<double> run_times;
         
         for (int i = 0; i < num_runs; ++i) {
-            double duration = benchmark::time(func, args...); 
+            std::invoke(setup);
+            double duration = benchmark::time(func);
             run_times.push_back(duration);
         }
 
@@ -58,6 +90,11 @@ public:
         double total_time = std::accumulate(run_times.begin(), run_times.end(), 0.0);
         
         return total_time / num_runs; // Returns the average 
+    }
+
+    template <typename Function>
+    static double run_benchmark(Function&& func, int num_runs){
+        return run_benchmark(std::forward<Function>(func), num_runs, [] {});
     }
 
     //Non-timing Functon Execution

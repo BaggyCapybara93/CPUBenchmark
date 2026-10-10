@@ -493,16 +493,19 @@ bool benchmark_report::compare_with_previous(const std::string& save_folder, con
             std::string line;
             std::string prev_cpu = "Unknown";
             std::string prev_ram = "Unknown";
+            int prev_measurement_version = 0;
             std::map<std::string, std::vector<double>> prev_times;
             std::map<std::string, std::vector<double>> prev_scores;
             std::string candidate_name;
             std::string current_benchmark;
 
             while (std::getline(prev_file_stream, line)) {
-                if (line.find("CPU:") == 0) {
-                    prev_cpu = line.substr(4);
-                } else if (line.find("RAM:") == 0) {
-                    prev_ram = line.substr(4);
+                if (line.starts_with("CPU: ")) {
+                    prev_cpu = line.substr(5);
+                } else if (line.starts_with("RAM: ")) {
+                    prev_ram = line.substr(5);
+                } else if (line.starts_with("Measurement Version: ")) {
+                    prev_measurement_version = std::stoi(line.substr(std::string("Measurement Version: ").size()));
                 } else if (line.find("Score: ") == 0 && !candidate_name.empty()) {
                     try {
                         prev_scores[candidate_name].push_back(std::stod(line.substr(7)));
@@ -525,6 +528,11 @@ bool benchmark_report::compare_with_previous(const std::string& save_folder, con
                 }
             }
             prev_file_stream.close();
+
+            if (prev_measurement_version != measurement_version) {
+                std::cout << "Skipping comparison (measurement method changed)\n\n";
+                return false;
+            }
             
             // Check if systems are similar
             bool systems_similar = are_systems_similar(current_cpu, current_ram, prev_cpu, prev_ram);

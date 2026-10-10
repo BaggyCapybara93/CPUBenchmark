@@ -59,6 +59,7 @@ bool file_manager::write_txt(const benchmark_report& report, const std::string& 
         file << "Logical CPU Cores: " << report.get_logical_cpu_cores() << "\n";
         file << "CPU Frequency: " << report.get_cpu_frequency_info() << "\n";
         file << "Active Benchmark Threads: " << report.get_active_thread_count() << "\n";
+        file << "Measurement Version: " << benchmark_report::measurement_version << "\n";
         file << "==========================================\n\n";
 
         // Compute and write statistics for each benchmark
@@ -121,6 +122,7 @@ bool file_manager::write_json(const benchmark_report& report, const std::string&
 
         j["saveFolder"] = save_folder;
         j["combinedScore"] = report.get_combined_score();
+        j["measurementVersion"] = benchmark_report::measurement_version;
         j["cpuName"] = report.get_cpu_name();
         j["ramInfo"] = report.get_ram_info();
         j["systemMetadata"] = {

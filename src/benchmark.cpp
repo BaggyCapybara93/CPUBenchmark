@@ -158,71 +158,80 @@ void benchmark::n_body_benchmark(int n_bodies, int steps) {
     }
 }
 
-void benchmark::sorting_benchmark(int size) {
-    using std::size_t;
-
-    // --- Preallocate ---
-    std::vector<int> data(static_cast<size_t>(size));
-    std::vector<int> backup(static_cast<size_t>(size));
-
-    // --- Generate random data ---
+benchmark::sorting_workload::sorting_workload(int size)
+    : input_(static_cast<std::size_t>(size)), working_(static_cast<std::size_t>(size)) {
     std::mt19937 rng(2026); 
     std::uniform_int_distribution<int> dist(0, size);
-
-    for (auto& v : data)
+    for (auto& v : input_)
         v = dist(rng);
+}
 
-    // Keep a copy so each timed run sorts identical input
-    backup = data;
+void benchmark::sorting_workload::reset() {
+    std::copy(input_.begin(), input_.end(), working_.begin());
+}
 
-    data = backup;
-    std::sort(data.begin(), data.end());
+void benchmark::sorting_workload::run() {
+    std::sort(working_.begin(), working_.end());
 
-    // Prevent optimization
-    escape(data[0]);
+    if (!working_.empty()) {
+        escape(working_.front());
+    }
     clobber();
 }
 
-void benchmark::memory_bandwidth_benchmark(size_t size){
-    std::vector<double> a(size, 1.0);
-    std::vector<double> b(size, 2.0);
-    std::vector<double> c(size, 0.0);
+void benchmark::sorting_benchmark(int size) {
+    sorting_workload workload(size);
+    workload.reset();
+    workload.run();
+}
 
+benchmark::memory_bandwidth_workload::memory_bandwidth_workload(std::size_t size)
+    : a_(size, 1.0), b_(size, 2.0), c_(size, 0.0) {}
+
+void benchmark::memory_bandwidth_workload::run() {
     const double scalar = 3.0;
 
-    for (std::size_t i = 0; i < size; ++i) {
-        c[i] = a[i] + scalar * b[i];
+    for (std::size_t i = 0; i < c_.size(); ++i) {
+        c_[i] = a_[i] + scalar * b_[i];
     }
 
     double sum = 0.0;
-    for (double v : c) sum += v;
+    for (double v : c_) sum += v;
 
     escape(sum);
     clobber();
 }
 
-void benchmark::pointer_chase_benchmark(size_t size) {
-    if (size == 0) {
-        return;
-    }
+void benchmark::memory_bandwidth_benchmark(size_t size) {
+    memory_bandwidth_workload workload(size);
+    workload.run();
+}
 
+benchmark::pointer_chase_workload::pointer_chase_workload(std::size_t size)
+    : next_(size) {
     std::vector<size_t> order(size);
     std::iota(order.begin(), order.end(), 0);
 
     std::mt19937 rng(2026);
     std::shuffle(order.begin(), order.end(), rng);
 
-    std::vector<size_t> next(size);
     for (size_t i = 0; i < size; ++i) {
-        next[order[i]] = order[(i + 1) % size];
+        next_[order[i]] = order[(i + 1) % size];
     }
+}
 
+void benchmark::pointer_chase_workload::run() const {
     size_t idx = 0;
-    for (size_t i = 0; i < size; ++i)
-        idx = next[idx];
+    for (size_t i = 0; i < next_.size(); ++i)
+        idx = next_[idx];
 
     escape(idx);
     clobber();
+}
+
+void benchmark::pointer_chase_benchmark(size_t size) {
+    pointer_chase_workload workload(size);
+    workload.run();
 }
 
 void benchmark::cache_latency_benchmark(size_t size, size_t stride) {

@@ -18,7 +18,7 @@ class benchmark_thread_pool{
         std::shared_ptr<Settings> settings_;
         int num_threads_;
         std::vector<std::thread> workers_;
-        std::function<void()> current_task_;
+        std::function<void(std::size_t)> current_task_;
         std::barrier<> start_barrier_;
         std::barrier<> done_barrier_;
         std::atomic<bool> stop_{false}; 
@@ -50,6 +50,7 @@ class benchmark_thread_pool{
         }
 
         void run_all(const std::function<void()>& fn);
+        void run_all_indexed(const std::function<void(std::size_t)>& fn);
 };
 
 class benchmark_coordinator{

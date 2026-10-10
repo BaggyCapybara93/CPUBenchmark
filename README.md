@@ -23,6 +23,8 @@ make
 
 ## Usage
 
+Sorting, memory bandwidth, and pointer chasing prepare their inputs before timing. Sorting restores the same input before each warmup and measured run. Timings use a monotonic clock and include worker dispatch overhead. Reports carry a measurement version; comparisons skip older results when the measurement method changes.
+
 ### Basic Usage
 ```bash
 # Run both single-threaded and multi-threaded benchmarks
