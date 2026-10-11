@@ -13,6 +13,7 @@ A simple C++ CPU benchmark tool for measuring system performance.
   - Sorting algorithms
 - Configurable parameters (threads, iterations, intensity)
 - Score calculation and reporting (relative performance metrics)
+- Throughput in recorded work units per second, plus estimated logical GB/s for memory bandwidth
 - RAM capacity, type, and speed in text and JSON reports when available from the OS
 
 ## Building
@@ -27,6 +28,8 @@ make
 Sorting, memory bandwidth, and pointer chasing prepare their inputs before timing. Sorting restores the same input before each warmup and measured run. Timings use a monotonic clock and include worker dispatch overhead. Reports carry a measurement version; comparisons skip older results when the measurement method changes.
 
 `numRuns` controls the number of timed samples per benchmark and suite repetition. Reports show their mean, median, min, max, standard deviation, P95, and P99; JSON reports also include every raw run time. Warmup runs are excluded from these statistics.
+
+Throughput divides the work performed in one measured sample by its mean elapsed time, including worker dispatch overhead. Each benchmark keeps its own work unit, such as loop iterations, pointer hops, or elements processed, so rates with different units are not directly comparable. The memory bandwidth workload also reports estimated logical GB/s using 32 bytes per element: two `double` reads, one `double` write, and one checksum read. This counts operations in the workload, not measured traffic to DRAM; GB means 1,000,000,000 bytes.
 
 Single-threaded and multi-threaded modes process the same logical work shards, based on `--threads`. Reports record each benchmark's total work per measured sample and the full run configuration. A saved text run is compared with the newest earlier run only when the workload, active thread count, profile, scoring settings, build settings, and hardware match. Results from different configurations remain available in their reports without a percentage comparison.
 

@@ -91,6 +91,16 @@ bool file_manager::write_txt(const benchmark_report& report, const std::string& 
             file << "Score: " << std::fixed << std::setprecision(2) << s.score_ << "\n";
             file << "Work: " << s.total_work_ << " " << s.work_unit_ << "\n";
             file << "Time (mean): " << std::fixed << std::setprecision(9) << s.time_ << "s\n";
+            if (const auto rate = s.work_per_second()) {
+                file << "Throughput: " << std::fixed << std::setprecision(2) << *rate
+                     << " " << s.work_unit_ << "/s\n";
+            }
+            if (const auto bandwidth = s.estimated_gb_per_second()) {
+                file << "Estimated Logical Throughput: " << std::fixed << std::setprecision(3)
+                     << *bandwidth << " GB/s (" << s.estimated_bytes_per_work_
+                     << " bytes per work unit)\n";
+            }
+            file << std::setprecision(9);
             file << "Min: " << stats.min_time << "s\n";
             file << "Max: " << stats.max_time << "s\n";
             file << "Median: " << stats.median_time << "s\n";
@@ -155,6 +165,8 @@ bool file_manager::write_json(const benchmark_report& report, const std::string&
             if (s.benchmark_name_ == "Combined") continue;
             auto stats = report.get_stats(s);
             const int repetition = ++repetition_indices[s.benchmark_name_];
+            const auto work_rate = s.work_per_second();
+            const auto logical_bandwidth = s.estimated_gb_per_second();
             
             j["scores"].push_back({
                 {"benchmarkName", s.benchmark_name_},
@@ -162,6 +174,10 @@ bool file_manager::write_json(const benchmark_report& report, const std::string&
                 {"score", s.score_},
                 {"totalWork", s.total_work_},
                 {"workUnit", s.work_unit_},
+                {"workPerSecond", work_rate ? json(*work_rate) : json(nullptr)},
+                {"throughputUnit", work_rate ? json(s.work_unit_ + "/s") : json(nullptr)},
+                {"estimatedLogicalGBps", logical_bandwidth ? json(*logical_bandwidth) : json(nullptr)},
+                {"estimatedBytesPerWork", s.estimated_bytes_per_work_},
                 {"time", s.time_},
                 {"runTimes", s.samples_},
                 {"minTime", stats.min_time},

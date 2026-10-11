@@ -228,8 +228,11 @@ std::vector<score> benchmark_coordinator::run_specific_benchmarks(
                     workloads[shard]->run();
                 });
             };
+            // Each element reads a and b, writes c, then reads c for the checksum.
+            constexpr std::uint64_t estimated_bytes_per_element = 4 * sizeof(double);
             elapsed = scorer.add_score("memory_bandwidth", benchmark::run_benchmark(runner, num_runs),
-                                       "elements processed", work_product({total_effective, 8}));
+                                       "elements processed", work_product({total_effective, 8}),
+                                       estimated_bytes_per_element);
         } else if (benchmark_name == "pointer_chase" || benchmark_name == "pointer") {
             auto workloads = prepare_workloads<benchmark::pointer_chase_workload>(
                 pool, worker_count, shard_count, [&](std::size_t shard) {
@@ -260,6 +263,13 @@ std::vector<score> benchmark_coordinator::run_specific_benchmarks(
 
         total_time += elapsed;
         std::cout << benchmark_name << " completed in " << elapsed << " seconds.\n";
+        const auto result = scorer.get_scores().back();
+        if (const auto rate = result.work_per_second()) {
+            std::cout << "Throughput: " << *rate << " " << result.work_unit_ << "/s\n";
+        }
+        if (const auto bandwidth = result.estimated_gb_per_second()) {
+            std::cout << "Estimated logical throughput: " << *bandwidth << " GB/s\n";
+        }
         std::cout << "Benchmark score: " << scorer.compute_final_score() << "\n";
     }
 

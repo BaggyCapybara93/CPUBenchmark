@@ -8,6 +8,7 @@
 #include <mutex>
 #include <utility>
 #include <cstdint>
+#include <optional>
 
 struct score {
     std::string benchmark_name_;
@@ -24,6 +25,23 @@ struct score {
     std::vector<double> samples_;
     std::string work_unit_;
     std::uint64_t total_work_ = 0;
+    std::uint64_t estimated_bytes_per_work_ = 0;
+
+    std::optional<double> work_per_second() const {
+        if (total_work_ == 0 || work_unit_.empty() || !std::isfinite(time_) || time_ <= 0.0) {
+            return std::nullopt;
+        }
+        const double rate = static_cast<double>(total_work_) / time_;
+        return std::isfinite(rate) ? std::optional<double>(rate) : std::nullopt;
+    }
+
+    std::optional<double> estimated_gb_per_second() const {
+        const auto rate = work_per_second();
+        if (!rate || estimated_bytes_per_work_ == 0) return std::nullopt;
+        const double gb_per_second = *rate * static_cast<double>(estimated_bytes_per_work_) / 1e9;
+        return std::isfinite(gb_per_second)
+            ? std::optional<double>(gb_per_second) : std::nullopt;
+    }
 
     score(const std::string& name, double s, double t)
         : benchmark_name_(name), score_(s), time_(t),
@@ -79,7 +97,8 @@ public:
     // Add one measured benchmark time.
     void add_score(const std::string& benchmark_name, double elapsed_time);
     double add_score(const std::string& benchmark_name, std::vector<double> run_times,
-                     std::string work_unit = {}, std::uint64_t total_work = 0);
+                     std::string work_unit = {}, std::uint64_t total_work = 0,
+                     std::uint64_t estimated_bytes_per_work = 0);
 
     // Clear all stored scores
     void clear_scores();

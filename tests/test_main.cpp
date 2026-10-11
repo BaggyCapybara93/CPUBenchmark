@@ -128,11 +128,23 @@ void test_report_combined_score() {
             "reports must expose system metadata");
 }
 
-void test_memory_metadata_serialization() {
+void test_report_serialization() {
     auto settings = std::make_shared<Settings>();
     file_manager manager(settings);
+    scorer measured;
+    measured.add_score("memory_bandwidth", {2.0, 4.0}, "elements processed",
+                       3'000'000'000ULL, 4 * sizeof(double));
+    const auto workload = measured.get_scores().front();
+    require(workload.work_per_second() &&
+                approximately_equal(*workload.work_per_second(), 1'000'000'000.0) &&
+                workload.estimated_gb_per_second() &&
+                approximately_equal(*workload.estimated_gb_per_second(), 32.0),
+            "throughput must use work per sample and mean measured time");
+    require(!score("Combined", 100.0, 0.0).work_per_second(),
+            "synthetic scores must not have throughput");
     benchmark_report report;
     report.set_run_configuration(*settings, {}, 1);
+    report.add_score({workload});
     const auto directory = std::filesystem::temp_directory_path() /
         ("cpubenchmark_memory_" + std::to_string(
             std::chrono::steady_clock::now().time_since_epoch().count()));
@@ -152,12 +164,21 @@ void test_memory_metadata_serialization() {
             require(data.at("ramType") == report.get_ram_type() &&
                         data.at("ramSpeed") == report.get_ram_speed(),
                     "JSON report must include RAM type and speed");
+            const auto& result = data.at("scores").at(0);
+            require(approximately_equal(result.at("workPerSecond").get<double>(), 1'000'000'000.0) &&
+                        result.at("throughputUnit") == "elements processed/s" &&
+                        approximately_equal(result.at("estimatedLogicalGBps").get<double>(), 32.0) &&
+                        result.at("estimatedBytesPerWork") == 32,
+                    "JSON report must include work throughput and estimated logical GB/s");
         } else {
             std::ostringstream text;
             text << input.rdbuf();
             require(text.str().find("RAM Type: " + report.get_ram_type()) != std::string::npos &&
                         text.str().find("RAM Speed: " + report.get_ram_speed()) != std::string::npos,
                     "text report must include RAM type and speed");
+            require(text.str().find("Throughput: 1000000000.00 elements processed/s") != std::string::npos &&
+                        text.str().find("Estimated Logical Throughput: 32.000 GB/s") != std::string::npos,
+                    "text report must include work throughput and estimated logical GB/s");
         }
     }
     std::filesystem::remove_all(directory);
@@ -269,6 +290,11 @@ void test_same_work_in_both_modes() {
     require(single_scores[1].total_work_ == 398 && single_scores[2].total_work_ == 1536 &&
                 single_scores[5].total_work_ == 150000 && single_scores[6].total_work_ == 3208,
             "work totals must include shard remainders and fixed-size workloads");
+    require(single_scores[6].estimated_bytes_per_work_ == 32 &&
+                multi_scores[6].estimated_bytes_per_work_ == 32 &&
+                single_scores[6].estimated_gb_per_second() &&
+                multi_scores[6].estimated_gb_per_second(),
+            "memory bandwidth runs must report estimated logical byte throughput");
 }
 
 }  // namespace
@@ -280,7 +306,7 @@ int main(int argc, char* argv[]) {
         test_run_samples_and_statistics();
         test_profile(argv[1]);
         test_report_combined_score();
-        test_memory_metadata_serialization();
+        test_report_serialization();
         test_comparison_requires_matching_configuration();
         test_same_work_in_both_modes();
         return EXIT_SUCCESS;
