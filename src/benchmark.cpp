@@ -181,6 +181,36 @@ void benchmark::branch_prediction_benchmark(int iterations){
     clobber();
 }
 
+benchmark::branch_pattern_workload::branch_pattern_workload(
+    int iterations, branch_pattern pattern)
+    : pattern_(iterations > 0 ? static_cast<std::size_t>(iterations) : 0U) {
+    if (iterations <= 0) {
+        throw std::invalid_argument("Branch pattern iterations must be positive");
+    }
+    for (std::size_t i = 0; i < pattern_.size(); ++i) {
+        pattern_[i] = static_cast<std::uint8_t>((i & 1U) == 0U);
+        taken_count_ += pattern_[i];
+    }
+    if (pattern == branch_pattern::unpredictable) {
+        std::mt19937 rng(2026);
+        std::shuffle(pattern_.begin(), pattern_.end(), rng);
+    }
+}
+
+std::uint64_t benchmark::branch_pattern_workload::run() const {
+    volatile std::uint64_t taken = 0;
+    for (std::uint8_t condition : pattern_) {
+        if (condition != 0U) {
+            // The conditional volatile write preserves a real branch in optimized builds.
+            taken = taken + 1U;
+        }
+    }
+    const std::uint64_t result = taken;
+    escape(result);
+    clobber();
+    return result;
+}
+
 void benchmark::n_body_benchmark(int n_bodies, int steps) {
     using std::size_t;
 

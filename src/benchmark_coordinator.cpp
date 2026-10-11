@@ -62,6 +62,10 @@ bool is_floating_kernel(const std::string& name) {
     return name == "floating_add" || name == "floating_multiply" || name == "floating_divide";
 }
 
+bool is_branch_pattern(const std::string& name) {
+    return name == "branch_predictable" || name == "branch_unpredictable";
+}
+
 std::uint64_t work_product(std::initializer_list<std::uint64_t> factors) {
     std::uint64_t product = 1;
     for (std::uint64_t factor : factors) {
@@ -128,6 +132,10 @@ std::vector<score> benchmark_coordinator::run_specific_benchmarks(
         if (is_integer_kernel(name) || is_floating_kernel(name)) {
             run_settings.weights.try_emplace(name, 0.05);
             run_settings.baseline_times.try_emplace(name, is_integer_kernel(name) ? 0.015 : 0.020);
+        }
+        if (is_branch_pattern(name)) {
+            run_settings.weights.try_emplace(name, 0.05);
+            run_settings.baseline_times.try_emplace(name, 0.020);
         }
     }
     report_.set_run_configuration(run_settings, benchmark_names, num_threads);
@@ -249,6 +257,21 @@ std::vector<score> benchmark_coordinator::run_specific_benchmarks(
             };
             elapsed = scorer.add_score("branch", benchmark::run_benchmark(runner, num_runs),
                                        "input elements", total_effective);
+        } else if (is_branch_pattern(benchmark_name)) {
+            const branch_pattern pattern = benchmark_name == "branch_predictable"
+                ? branch_pattern::predictable : branch_pattern::unpredictable;
+            auto workloads = prepare_workloads<benchmark::branch_pattern_workload>(
+                pool, worker_count, shard_count, [&](std::size_t shard) {
+                    return std::make_unique<benchmark::branch_pattern_workload>(
+                        iterations_by_shard[shard], pattern);
+                });
+            auto runner = [&]() {
+                run_shards(pool, worker_count, shard_count, [&](std::size_t shard) {
+                    workloads[shard]->run();
+                });
+            };
+            elapsed = scorer.add_score(benchmark_name, benchmark::run_benchmark(runner, num_runs),
+                                       "branch decisions", total_effective);
         } else if (benchmark_name == "n_body") {
             constexpr int steps = 10;
             std::vector<int> bodies_by_shard(shard_count);

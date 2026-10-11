@@ -14,6 +14,7 @@
 #include <cstdint>
 
 enum class arithmetic_operation { add, multiply, divide };
+enum class branch_pattern { predictable, unpredictable };
 
 class benchmark {
 public:
@@ -38,6 +39,16 @@ public:
         int iterations_;
         arithmetic_operation operation_;
         std::array<double, 256> operands_{};
+    };
+
+    struct branch_pattern_workload {
+        branch_pattern_workload(int iterations, branch_pattern pattern);
+        std::uint64_t run() const;
+        std::uint64_t taken_count() const { return taken_count_; }
+
+    private:
+        std::vector<std::uint8_t> pattern_;
+        std::uint64_t taken_count_ = 0;
     };
 
     struct sorting_workload {

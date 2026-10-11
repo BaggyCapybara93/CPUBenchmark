@@ -16,6 +16,7 @@ A simple C++ CPU benchmark tool for measuring system performance.
 - Throughput in recorded work units per second, plus estimated logical GB/s for memory bandwidth
 - RAM capacity, type, and speed in text and JSON reports when available from the OS
 - Optional integer and floating-point add, multiply, and divide kernels
+- Optional predictable and unpredictable branch kernels with matched taken counts
 - Optional cache-size sweep with working-set size and effective pointer-hop latency in reports
 
 ## Building
@@ -27,7 +28,7 @@ make
 
 ## Usage
 
-Sorting, memory bandwidth, and pointer chasing prepare their inputs before timing. Sorting restores the same input before each warmup and measured run. Timings use a monotonic clock and include worker dispatch overhead. Reports carry a measurement version; comparisons skip older results when the measurement method changes.
+Sorting, memory bandwidth, pointer chasing, and the optional branch patterns prepare their inputs before timing. Sorting restores the same input before each warmup and measured run. Timings use a monotonic clock and include worker dispatch overhead. Reports carry a measurement version; comparisons skip older results when the measurement method changes.
 
 `numRuns` controls the number of timed samples per benchmark and suite repetition. Reports show their mean, median, min, max, standard deviation, P95, and P99; JSON reports also include every raw run time. Warmup runs are excluded from these statistics.
 
@@ -89,6 +90,7 @@ num_runs=3
 - `integer_arithmetic` - Integer arithmetic
 - `matrix_multiply` - Matrix multiplication
 - `branch_prediction` - Branch prediction
+- `branch_predictable`, `branch_unpredictable` - Matched branch patterns for comparison
 - `n_body` - N-body simulation
 - `sorting` - Sorting algorithms
 - `memory_bandwidth` - Memory bandwidth
@@ -99,6 +101,17 @@ num_runs=3
 - `floating_add`, `floating_multiply`, `floating_divide` - Basic double-precision kernels
 
 The six arithmetic kernels are available in profiles and are not part of the default full suite, so existing default scores retain their benchmark mix. Each uses eight independent accumulator lanes and cache-resident, deterministic operands. The integer divide kernel varies its dividend from the accumulator to keep the division in each loop iteration; its reported work count includes divisions, while the accumulator update is overhead. Floating-point factors are paired with reciprocals so long multiply and divide runs remain finite. Work counts are rounded up to whole groups of eight operations per shard. Results include loop, input-load, and thread-dispatch overhead, and Release builds may auto-vectorize them. Use them for relative comparisons with the same build and profile rather than as isolated instruction latency measurements.
+
+The two branch kernels are profile-only and use the same number of decisions and taken branches per shard. `branch_predictable` repeats a short alternating pattern; `branch_unpredictable` shuffles the same values with a fixed seed. Pattern generation happens before timing, and a conditional volatile update keeps the branch in optimized builds. Compare their mean time or throughput with the same build, thread count, and profile. The timings also include input loads and the conditional update, so they are a workload comparison rather than a direct branch-misprediction counter. The existing `branch_prediction` benchmark remains in the default suite with its original measurement method.
+
+```text
+name=branch_patterns
+benchmarks=branch_predictable,branch_unpredictable
+iterations=10000000
+repeat_count=1
+intensity_multiplier=1
+num_runs=5
+```
 
 The cache-size sweep is also profile-only. It allocates one randomized, dependent pointer cycle per active worker, with one 64-byte node per cache line, before timing. Each size uses the same hop count and receives five warmups plus `num_runs` measured samples. Reports list the working set **per worker** and effective nanoseconds per hop per active worker; the latter includes thread dispatch and scheduling overhead. In multi-threaded mode, other workers can contend for shared caches and memory. The sweep is diagnostic and does not enter the combined score; a sweep-only report has no combined score. Cache-level boundaries are inferred from changes in the latency curve, not detected directly.
 

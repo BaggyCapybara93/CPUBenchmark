@@ -72,6 +72,8 @@ struct Settings{
         "floating_point",
         "matrix_multiply",
         "branch_prediction",
+        "branch_predictable",
+        "branch_unpredictable",
         "n_body",
         "sorting",
         "memory_bandwidth",

@@ -79,6 +79,8 @@ private:
     std::unordered_map<std::string, double> weights_ = {
         {"floating_point", 0.25},
         {"branch", 0.10},
+        {"branch_predictable", 0.05},
+        {"branch_unpredictable", 0.05},
         {"integer",       0.20},
         {"sorting",       0.20},
         {"matrix_multiply",0.20},
@@ -97,6 +99,8 @@ private:
     std::unordered_map<std::string, double> baseline_times_ = {
         {"floating_point", 0.020},
         {"branch", 0.020},
+        {"branch_predictable", 0.020},
+        {"branch_unpredictable", 0.020},
         {"integer",       0.015},
         {"sorting",       0.050},
         {"matrix_multiply",0.040},

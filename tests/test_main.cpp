@@ -140,6 +140,59 @@ void test_arithmetic_kernels() {
             "floating-point kernels must remain finite over long runs");
 }
 
+void test_branch_patterns() {
+    for (int iterations : {1, 2, 101, 1000}) {
+        benchmark::branch_pattern_workload predictable(
+            iterations, branch_pattern::predictable);
+        benchmark::branch_pattern_workload unpredictable(
+            iterations, branch_pattern::unpredictable);
+        const auto expected_taken = static_cast<std::uint64_t>((iterations + 1) / 2);
+        require(predictable.taken_count() == expected_taken &&
+                    unpredictable.taken_count() == expected_taken &&
+                    predictable.run() == expected_taken &&
+                    unpredictable.run() == expected_taken,
+                "branch patterns must make the same number of decisions and taken branches");
+    }
+
+    auto settings = std::make_shared<Settings>();
+    settings->thread_count = 3;
+    const std::vector<std::string> names = {
+        "branch_predictable", "branch_unpredictable"};
+    const auto profile_path = std::filesystem::temp_directory_path() /
+        ("cpubenchmark_branch_patterns_" + std::to_string(
+            std::chrono::steady_clock::now().time_since_epoch().count()) + ".txt");
+    {
+        std::ofstream profile(profile_path);
+        profile << "name=branch_patterns\n"
+                   "benchmarks=branch_predictable,branch_unpredictable\n"
+                   "iterations=401\nintensity_multiplier=1\n"
+                   "num_runs=2\nrepeat_count=1\n";
+    }
+    file_manager manager(settings);
+    manager.load_profile(profile_path.string());
+    std::filesystem::remove(profile_path);
+    require(settings->profile.benchmarks == names,
+            "profile loading must accept both branch pattern kernels");
+    for (const mode run_mode : {mode::single_threaded, mode::multi_threaded}) {
+        benchmark_report report;
+        benchmark_coordinator coordinator(report, settings);
+        coordinator.start_with_profile(names, run_mode);
+        const auto& results = report.get_benchmark_scores();
+        require(results.size() == 3 && results[0].benchmark_name_ == names[0] &&
+                    results[1].benchmark_name_ == names[1],
+                "both branch patterns must be independently selectable");
+        for (std::size_t i = 0; i < names.size(); ++i) {
+            require(settings->known_benchmarks.contains(names[i]) &&
+                        results[i].total_work_ == 401 &&
+                        results[i].work_unit_ == "branch decisions" &&
+                        results[i].samples_.size() == 2 && results[i].work_per_second() &&
+                        report.get_run_configuration().at("weights").contains(names[i]) &&
+                        report.get_run_configuration().at("baselineTimes").contains(names[i]),
+                    "branch pattern results must report equal work and scoring settings");
+        }
+    }
+}
+
 void test_profile(const std::string& profile_path) {
     auto settings = std::make_shared<Settings>();
     file_manager manager(settings);
@@ -441,6 +494,7 @@ int main(int argc, char* argv[]) {
         test_scorer();
         test_run_samples_and_statistics();
         test_arithmetic_kernels();
+        test_branch_patterns();
         test_profile(argv[1]);
         test_report_combined_score();
         test_report_serialization();
