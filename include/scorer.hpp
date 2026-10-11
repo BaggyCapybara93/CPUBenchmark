@@ -7,6 +7,7 @@
 #include <cmath>
 #include <mutex>
 #include <utility>
+#include <cstdint>
 
 struct score {
     std::string benchmark_name_;
@@ -21,6 +22,8 @@ struct score {
     double p95_;
     double p99_;
     std::vector<double> samples_;
+    std::string work_unit_;
+    std::uint64_t total_work_ = 0;
 
     score(const std::string& name, double s, double t)
         : benchmark_name_(name), score_(s), time_(t),
@@ -75,7 +78,8 @@ public:
 
     // Add one measured benchmark time.
     void add_score(const std::string& benchmark_name, double elapsed_time);
-    double add_score(const std::string& benchmark_name, std::vector<double> run_times);
+    double add_score(const std::string& benchmark_name, std::vector<double> run_times,
+                     std::string work_unit = {}, std::uint64_t total_work = 0);
 
     // Clear all stored scores
     void clear_scores();

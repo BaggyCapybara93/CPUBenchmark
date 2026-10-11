@@ -1,11 +1,15 @@
 #include "benchmark.hpp"
 #include "benchmark_report.hpp"
+#include "benchmark_coordinator.hpp"
 #include "file_manager.hpp"
 #include "scorer.hpp"
 
 #include <algorithm>
+#include <chrono>
 #include <cmath>
 #include <cstdlib>
+#include <filesystem>
+#include <fstream>
 #include <iostream>
 #include <memory>
 #include <stdexcept>
@@ -122,6 +126,104 @@ void test_report_combined_score() {
             "reports must expose system metadata");
 }
 
+void test_comparison_requires_matching_configuration() {
+    Settings settings;
+    settings.thread_count = 2;
+    settings.iterations = 400;
+    benchmark_report report;
+    report.set_run_configuration(settings, {"alpha"}, 1);
+    report.add_score({score("alpha", 100.0, 1.0)});
+
+    const auto directory = std::filesystem::temp_directory_path() /
+        ("cpubenchmark_comparison_" + std::to_string(
+            std::chrono::steady_clock::now().time_since_epoch().count()));
+    std::filesystem::create_directories(directory);
+    const auto older = directory / "benchmark_scores_2026-01-01_00-00-00.txt";
+    const auto newer = directory / "benchmark_scores_2026-01-02_00-00-00.txt";
+    const auto write_run = [&](const std::filesystem::path& path, const nlohmann::json& config,
+                               bool include_time = true) {
+        std::ofstream output(path);
+        require(output.good(), "could not create comparison fixture");
+        output << "CPU: " << report.get_cpu_name() << '\n';
+        output << "RAM: " << report.get_ram_info() << '\n';
+        output << "Run Configuration: " << config.dump() << '\n';
+        output << "alpha\nScore: 100.0\n";
+        if (include_time) {
+            output << "Time (mean): 1.0s\n";
+        }
+    };
+
+    write_run(older, report.get_run_configuration());
+    auto mismatched = report.get_run_configuration();
+    mismatched["activeThreads"] = 2;
+    write_run(newer, mismatched);
+    require(report.compare_with_previous(directory.string(), "single_threaded", "current.txt"),
+            "comparison should find the newest compatible run, skipping incompatible runs");
+
+    write_run(older, report.get_run_configuration(), false);
+    require(!report.compare_with_previous(directory.string(), "single_threaded", "current.txt"),
+            "comparison must reject incomplete saved measurements");
+
+    mismatched["activeThreads"] = 1;
+    mismatched["iterations"] = 401;
+    write_run(older, mismatched);
+    require(!report.compare_with_previous(directory.string(), "single_threaded", "current.txt"),
+            "comparison must reject runs with different work or thread settings");
+
+    mismatched = report.get_run_configuration();
+    mismatched["build"]["type"] = "different-build";
+    write_run(older, mismatched);
+    require(!report.compare_with_previous(directory.string(), "single_threaded", "current.txt"),
+            "comparison must reject runs built with different settings");
+
+    mismatched = report.get_run_configuration();
+    mismatched["profileName"] = "different-profile";
+    write_run(older, mismatched);
+    require(!report.compare_with_previous(directory.string(), "single_threaded", "current.txt"),
+            "comparison must reject a different profile");
+    std::filesystem::remove_all(directory);
+}
+
+void test_same_work_in_both_modes() {
+    auto settings = std::make_shared<Settings>();
+    settings->thread_count = 3;
+    settings->iterations = 401;
+    settings->intensity_multiplier = 1;
+    settings->matrix_multiply_size = 8;
+    settings->num_runs = 1;
+    settings->repeat_count = 1;
+    const std::vector<std::string> names = {
+        "floating_point", "integer_arithmetic", "matrix_multiply", "branch_prediction",
+        "n_body", "sorting", "memory_bandwidth", "pointer_chase", "cache_latency"
+    };
+
+    benchmark_report single;
+    benchmark_coordinator single_runner(single, settings);
+    single_runner.start_with_profile(names, mode::single_threaded);
+    benchmark_report multi;
+    benchmark_coordinator multi_runner(multi, settings);
+    multi_runner.start_with_profile(names, mode::multi_threaded);
+
+    const auto& single_scores = single.get_benchmark_scores();
+    const auto& multi_scores = multi.get_benchmark_scores();
+    require(single_scores.size() == multi_scores.size() && single_scores.size() == names.size() + 1,
+            "both modes must run the same benchmarks");
+    for (std::size_t i = 0; i < names.size(); ++i) {
+        require(single_scores[i].benchmark_name_ == multi_scores[i].benchmark_name_ &&
+                    single_scores[i].total_work_ == multi_scores[i].total_work_ &&
+                    single_scores[i].work_unit_ == multi_scores[i].work_unit_,
+                "single and multi threaded modes must perform the same recorded work");
+    }
+    require(single.get_run_configuration().at("logicalShards") == 3 &&
+                multi.get_run_configuration().at("logicalShards") == 3 &&
+                single.get_run_configuration().at("activeThreads") == 1 &&
+                multi.get_run_configuration().at("activeThreads") == 3,
+            "reports must distinguish work shards from active threads");
+    require(single_scores[1].total_work_ == 398 && single_scores[2].total_work_ == 1536 &&
+                single_scores[5].total_work_ == 150000 && single_scores[6].total_work_ == 3208,
+            "work totals must include shard remainders and fixed-size workloads");
+}
+
 }  // namespace
 
 int main(int argc, char* argv[]) {
@@ -131,6 +233,8 @@ int main(int argc, char* argv[]) {
         test_run_samples_and_statistics();
         test_profile(argv[1]);
         test_report_combined_score();
+        test_comparison_requires_matching_configuration();
+        test_same_work_in_both_modes();
         return EXIT_SUCCESS;
     } catch (const std::exception& error) {
         std::cerr << "Test failure: " << error.what() << '\n';

@@ -6,6 +6,7 @@
 #include <filesystem>
 #include <sstream>
 #include <memory>
+#include <iomanip>
 
 #include "settings.hpp"
 #include "parse_arguments.hpp"
@@ -23,10 +24,13 @@ class file_manager{
         std::string get_timestamped_file(const std::string& base_name, const std::string& extension) const {
             auto now = std::chrono::system_clock::now();
             std::time_t t = std::chrono::system_clock::to_time_t(now);
+            const auto microseconds = std::chrono::duration_cast<std::chrono::microseconds>(
+                now.time_since_epoch()).count() % 1000000;
 
             std::ostringstream oss;
             oss << base_name << "_"
                 << std::put_time(std::localtime(&t), "%Y-%m-%d_%H-%M-%S")
+                << "_" << std::setw(6) << std::setfill('0') << microseconds
                 << extension;
 
             return oss.str(); 

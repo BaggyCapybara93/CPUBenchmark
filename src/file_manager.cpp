@@ -61,6 +61,7 @@ bool file_manager::write_txt(const benchmark_report& report, const std::string& 
         file << "CPU Frequency: " << report.get_cpu_frequency_info() << "\n";
         file << "Active Benchmark Threads: " << report.get_active_thread_count() << "\n";
         file << "Measurement Version: " << benchmark_report::measurement_version << "\n";
+        file << "Run Configuration: " << report.get_run_configuration().dump() << "\n";
         file << "==========================================\n\n";
 
         std::unordered_map<std::string, int> repetition_counts;
@@ -86,6 +87,7 @@ bool file_manager::write_txt(const benchmark_report& report, const std::string& 
                      << repetition_counts.at(s.benchmark_name_) << "\n";
             }
             file << "Score: " << std::fixed << std::setprecision(2) << s.score_ << "\n";
+            file << "Work: " << s.total_work_ << " " << s.work_unit_ << "\n";
             file << "Time (mean): " << std::fixed << std::setprecision(9) << s.time_ << "s\n";
             file << "Min: " << stats.min_time << "s\n";
             file << "Max: " << stats.max_time << "s\n";
@@ -108,14 +110,7 @@ bool file_manager::write_txt(const benchmark_report& report, const std::string& 
         std::cout << "Benchmark saved to: " << fullPath << "\n";
         
         // Compare with previous runs
-        std::string mode_str;
-        if (settings_.get()->mode == mode::single_threaded) {
-            mode_str = "single_threaded";
-        } else if (settings_.get()->mode == mode::multi_threaded) {
-            mode_str = "multi_threaded";
-        } else {
-            mode_str = "both";
-        }
+        const std::string mode_str = std::filesystem::path(save_folder).filename().string();
         report.compare_with_previous(save_folder, mode_str, fullPath.string());
         
         return true;
@@ -138,6 +133,7 @@ bool file_manager::write_json(const benchmark_report& report, const std::string&
         j["saveFolder"] = save_folder;
         j["combinedScore"] = report.get_combined_score();
         j["measurementVersion"] = benchmark_report::measurement_version;
+        j["runConfiguration"] = report.get_run_configuration();
         j["cpuName"] = report.get_cpu_name();
         j["ramInfo"] = report.get_ram_info();
         j["systemMetadata"] = {
@@ -160,6 +156,8 @@ bool file_manager::write_json(const benchmark_report& report, const std::string&
                 {"benchmarkName", s.benchmark_name_},
                 {"suiteRepetition", repetition},
                 {"score", s.score_},
+                {"totalWork", s.total_work_},
+                {"workUnit", s.work_unit_},
                 {"time", s.time_},
                 {"runTimes", s.samples_},
                 {"minTime", stats.min_time},

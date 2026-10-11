@@ -1,5 +1,7 @@
 #pragma once
 #include "scorer.hpp"
+#include "settings.hpp"
+#include <nlohmann/json.hpp>
 #include <iomanip>
 #include <unordered_map>
 #include <vector>
@@ -17,6 +19,7 @@ class benchmark_report{
         std::string cpu_frequency_info = "";
         unsigned int logical_cpu_cores_ = 0;
         int active_thread_count_ = 0;
+        nlohmann::json run_configuration_;
 
         static std::string collect_cpu_name();
         static std::string collect_ram_info();
@@ -25,7 +28,7 @@ class benchmark_report{
         static std::string collect_cpu_frequency_info();
 
     public:
-        static constexpr int measurement_version = 2;
+        static constexpr int measurement_version = 3;
 
         //Constructor
         benchmark_report();
@@ -41,6 +44,10 @@ class benchmark_report{
         unsigned int get_logical_cpu_cores() const {return logical_cpu_cores_;}
         int get_active_thread_count() const {return active_thread_count_;}
         void set_active_thread_count(int thread_count) {active_thread_count_ = thread_count;}
+        void set_run_configuration(const Settings& settings,
+                                   const std::vector<std::string>& benchmark_names,
+                                   int active_thread_count);
+        const nlohmann::json& get_run_configuration() const { return run_configuration_; }
         
         // Get statistics for a benchmark
         struct benchmark_stats {

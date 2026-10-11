@@ -1,6 +1,10 @@
 #include "benchmark_coordinator.hpp"
 #include <iostream>
 #include <memory>
+#include <cstdint>
+#include <limits>
+#include <stdexcept>
+#include <initializer_list>
 
 //Threading
 void benchmark_thread_pool::run_all(const std::function<void()>& fn) {
@@ -48,12 +52,34 @@ void benchmark_thread_pool::worker_loop(std::size_t worker_index) {
 }
 
 namespace {
-template <typename Workload, typename... Args>
+std::uint64_t work_product(std::initializer_list<std::uint64_t> factors) {
+    std::uint64_t product = 1;
+    for (std::uint64_t factor : factors) {
+        if (factor != 0 && product > std::numeric_limits<std::uint64_t>::max() / factor) {
+            throw std::overflow_error("Benchmark work count is too large");
+        }
+        product *= factor;
+    }
+    return product;
+}
+
+template <typename Function>
+void run_shards(benchmark_thread_pool& pool, std::size_t worker_count,
+                std::size_t shard_count, Function&& fn) {
+    pool.run_all_indexed([&](std::size_t worker_index) {
+        for (std::size_t shard = worker_index; shard < shard_count; shard += worker_count) {
+            fn(shard);
+        }
+    });
+}
+
+template <typename Workload, typename Factory>
 std::vector<std::unique_ptr<Workload>> prepare_workloads(
-    benchmark_thread_pool& pool, int num_threads, Args... args) {
-    std::vector<std::unique_ptr<Workload>> workloads(static_cast<std::size_t>(num_threads));
-    pool.run_all_indexed([&](std::size_t index) {
-        workloads[index] = std::make_unique<Workload>(args...);
+    benchmark_thread_pool& pool, std::size_t worker_count, std::size_t shard_count,
+    Factory&& make_workload) {
+    std::vector<std::unique_ptr<Workload>> workloads(shard_count);
+    run_shards(pool, worker_count, shard_count, [&](std::size_t shard) {
+        workloads[shard] = make_workload(shard);
     });
     return workloads;
 }
@@ -66,120 +92,174 @@ void benchmark_coordinator::run_benchmark(runner_function runner)
 }
 
 std::vector<score> benchmark_coordinator::run_specific_benchmarks(
-    const std::vector<std::string>& benchmark_names, int num_threads, int iterations_per_thread) {
-    report_.set_active_thread_count(num_threads);
+    const std::vector<std::string>& benchmark_names, int num_threads, int total_iterations) {
+    if (num_threads <= 0 || settings_->thread_count <= 0 || total_iterations <= 0 ||
+        settings_->intensity_multiplier <= 0) {
+        throw std::invalid_argument("Benchmark needs positive thread, iteration, and intensity counts");
+    }
+    const std::size_t worker_count = static_cast<std::size_t>(num_threads);
+    const std::size_t shard_count = static_cast<std::size_t>(
+        std::min(settings_->thread_count, total_iterations));
+
+    report_.set_run_configuration(*settings_, benchmark_names, num_threads);
     scorer scorer;
     scorer.load_weights(settings_->weights);
     scorer.load_baseline_times(settings_->baseline_times);
-    
-    int intensity_multiplier = settings_.get()->intensity_multiplier;
-    int matrix_multiply_size = settings_.get()->matrix_multiply_size;
-    int num_runs = settings_.get()->num_runs;
 
-    iterations_per_thread *= intensity_multiplier;
+    const int intensity = settings_->intensity_multiplier;
+    const int num_runs = settings_->num_runs;
+    const std::uint64_t total_effective = work_product({
+        static_cast<std::uint64_t>(total_iterations), static_cast<std::uint64_t>(intensity)});
+    std::vector<int> iterations_by_shard(shard_count);
+    for (std::size_t shard = 0; shard < shard_count; ++shard) {
+        const auto iterations = static_cast<std::uint64_t>(total_iterations) / shard_count +
+            (shard < static_cast<std::uint64_t>(total_iterations) % shard_count ? 1U : 0U);
+        const auto effective = work_product({iterations, static_cast<std::uint64_t>(intensity)});
+        if (effective > static_cast<std::uint64_t>(std::numeric_limits<int>::max())) {
+            throw std::invalid_argument("Iterations per shard exceed the supported range");
+        }
+        iterations_by_shard[shard] = static_cast<int>(effective);
+    }
+
+    const double matrix_size_value = static_cast<double>(settings_->matrix_multiply_size) *
+                                     std::sqrt(static_cast<double>(intensity));
+    if (!std::isfinite(matrix_size_value) ||
+        matrix_size_value > static_cast<double>(std::numeric_limits<int>::max())) {
+        throw std::invalid_argument("Matrix size exceeds the supported range");
+    }
+    const int matrix_size = static_cast<int>(matrix_size_value);
+    const double sort_size_value = 50000.0 *
+        static_cast<double>(static_cast<int>(std::sqrt(static_cast<double>(intensity))));
+    if (!std::isfinite(sort_size_value) ||
+        sort_size_value > static_cast<double>(std::numeric_limits<int>::max())) {
+        throw std::invalid_argument("Sorting size exceeds the supported range");
+    }
+    const int sort_size = static_cast<int>(sort_size_value);
+
     benchmark_thread_pool pool(num_threads);
     double total_time = 0.0;
 
     for (const auto& benchmark_name : benchmark_names) {
         std::cout << "\n=== Running benchmark: " << benchmark_name << " ===\n";
-        
         double elapsed = 0.0;
 
         if (benchmark_name == "floating_point") {
-            auto float_runner = [&]() {
-                pool.run_all([&]() {
-                    benchmark::floating_point_benchmark(iterations_per_thread);
+            auto runner = [&]() {
+                run_shards(pool, worker_count, shard_count, [&](std::size_t shard) {
+                    benchmark::floating_point_benchmark(iterations_by_shard[shard]);
                 });
             };
-            elapsed = scorer.add_score("floating_point", benchmark::run_benchmark(float_runner, num_runs));
-            std::cout << "Floating-point benchmark completed in " << elapsed << " seconds.\n";
-        }
-        else if (benchmark_name == "integer_arithmetic" || benchmark_name == "integer") {
-            auto int_runner = [&]() {
-                pool.run_all([&]() {
-                    benchmark::integer_arithmetic_benchmark(iterations_per_thread);
+            elapsed = scorer.add_score("floating_point", benchmark::run_benchmark(runner, num_runs),
+                                       "loop iterations", total_effective);
+        } else if (benchmark_name == "integer_arithmetic" || benchmark_name == "integer") {
+            auto runner = [&]() {
+                run_shards(pool, worker_count, shard_count, [&](std::size_t shard) {
+                    benchmark::integer_arithmetic_benchmark(iterations_by_shard[shard]);
                 });
             };
-            elapsed = scorer.add_score("integer", benchmark::run_benchmark(int_runner, num_runs));
-            std::cout << "Integer arithmetic benchmark completed in " << elapsed << " seconds.\n";
-        }
-        else if (benchmark_name == "matrix_multiply") {
-            int actual_matrix_size = static_cast<int>(matrix_multiply_size * std::sqrt(static_cast<double>(intensity_multiplier)));
-            auto matrix_runner = [&]() {
-                pool.run_all([&]() {
-                    benchmark::matrix_multiply_benchmark(actual_matrix_size);
+            elapsed = scorer.add_score("integer", benchmark::run_benchmark(runner, num_runs),
+                                       "loop iterations", total_effective - shard_count);
+        } else if (benchmark_name == "matrix_multiply") {
+            auto runner = [&]() {
+                run_shards(pool, worker_count, shard_count, [&](std::size_t) {
+                    benchmark::matrix_multiply_benchmark(matrix_size);
                 });
             };
-            elapsed = scorer.add_score("matrix_multiply", benchmark::run_benchmark(matrix_runner, num_runs));
-            std::cout << "Matrix multiply benchmark completed in " << elapsed << " seconds.\n";
-        }
-        else if (benchmark_name == "branch_prediction" || benchmark_name == "branch") {
-            auto branch_runner = [&]() {
-                pool.run_all([&]() {
-                    benchmark::branch_prediction_benchmark(iterations_per_thread);
+            elapsed = scorer.add_score("matrix_multiply", benchmark::run_benchmark(runner, num_runs),
+                                       "multiply-adds", work_product({shard_count,
+                                           static_cast<std::uint64_t>(matrix_size),
+                                           static_cast<std::uint64_t>(matrix_size),
+                                           static_cast<std::uint64_t>(matrix_size)}));
+        } else if (benchmark_name == "branch_prediction" || benchmark_name == "branch") {
+            auto runner = [&]() {
+                run_shards(pool, worker_count, shard_count, [&](std::size_t shard) {
+                    benchmark::branch_prediction_benchmark(iterations_by_shard[shard]);
                 });
             };
-            elapsed = scorer.add_score("branch", benchmark::run_benchmark(branch_runner, num_runs));
-            std::cout << "Branch prediction benchmark completed in " << elapsed << " seconds.\n";
-        }
-        else if (benchmark_name == "n_body") {
-            int steps = 10;
-            int bodies = static_cast<int>(std::sqrt(iterations_per_thread));
-            auto nbody_runner = [&]() {
-                pool.run_all([&]() {
-                    benchmark::n_body_benchmark(bodies, steps);
+            elapsed = scorer.add_score("branch", benchmark::run_benchmark(runner, num_runs),
+                                       "input elements", total_effective);
+        } else if (benchmark_name == "n_body") {
+            constexpr int steps = 10;
+            std::vector<int> bodies_by_shard(shard_count);
+            std::uint64_t interactions = 0;
+            for (std::size_t shard = 0; shard < shard_count; ++shard) {
+                const int bodies = static_cast<int>(std::sqrt(
+                    static_cast<double>(iterations_by_shard[shard])));
+                bodies_by_shard[shard] = bodies;
+                const std::uint64_t shard_interactions = work_product({static_cast<std::uint64_t>(bodies),
+                    static_cast<std::uint64_t>(bodies - 1), static_cast<std::uint64_t>(steps)});
+                if (interactions > std::numeric_limits<std::uint64_t>::max() - shard_interactions) {
+                    throw std::overflow_error("N-body work count is too large");
+                }
+                interactions += shard_interactions;
+            }
+            auto runner = [&]() {
+                run_shards(pool, worker_count, shard_count, [&](std::size_t shard) {
+                    benchmark::n_body_benchmark(bodies_by_shard[shard], steps);
                 });
             };
-            elapsed = scorer.add_score("n_body", benchmark::run_benchmark(nbody_runner, num_runs));
-            std::cout << "NBody benchmark completed in " << elapsed << " seconds.\n";
-        }
-        else if (benchmark_name == "sorting") {
-            int sort_size = 50000 * static_cast<int>(std::sqrt(intensity_multiplier));
-            auto workloads = prepare_workloads<benchmark::sorting_workload>(pool, num_threads, sort_size);
-            auto reset_sort = [&]() {
-                pool.run_all_indexed([&](std::size_t index) { workloads[index]->reset(); });
-            };
-            auto sort_runner = [&]() {
-                pool.run_all_indexed([&](std::size_t index) { workloads[index]->run(); });
-            };
-            elapsed = scorer.add_score("sorting", benchmark::run_benchmark(sort_runner, num_runs, reset_sort));
-            std::cout << "Sorting benchmark completed in " << elapsed << " seconds.\n";
-        }
-        else if (benchmark_name == "memory_bandwidth") {
-            std::size_t mem_size = static_cast<std::size_t>(iterations_per_thread) * 8;
-            auto workloads = prepare_workloads<benchmark::memory_bandwidth_workload>(pool, num_threads, mem_size);
-            auto memory_runner = [&]() {
-                pool.run_all_indexed([&](std::size_t index) { workloads[index]->run(); });
-            };
-            elapsed = scorer.add_score("memory_bandwidth", benchmark::run_benchmark(memory_runner, num_runs));
-            std::cout << "Memory bandwidth benchmark completed in " << elapsed << " seconds.\n";
-        }
-        else if (benchmark_name == "pointer_chase" || benchmark_name == "pointer") {
-            std::size_t chase_size = static_cast<std::size_t>(iterations_per_thread);
-            auto workloads = prepare_workloads<benchmark::pointer_chase_workload>(pool, num_threads, chase_size);
-            auto pointer_chase_runner = [&]() {
-                pool.run_all_indexed([&](std::size_t index) { workloads[index]->run(); });
-            };
-            elapsed = scorer.add_score("pointer_chase", benchmark::run_benchmark(pointer_chase_runner, num_runs));
-            std::cout << "Pointer chase benchmark completed in " << elapsed << " seconds.\n";
-        }
-        else if (benchmark_name == "cache_latency" || benchmark_name == "cache") {
-            std::size_t cache_size = static_cast<std::size_t>(iterations_per_thread);
-            std::size_t cache_stride = 16;
-            auto cache_latency_runner = [&]() {
-                pool.run_all([&]() {
-                    benchmark::cache_latency_benchmark(cache_size, cache_stride);
+            elapsed = scorer.add_score("n_body", benchmark::run_benchmark(runner, num_runs),
+                                       "body-pair evaluations", interactions);
+        } else if (benchmark_name == "sorting") {
+            auto workloads = prepare_workloads<benchmark::sorting_workload>(
+                pool, worker_count, shard_count,
+                [&](std::size_t) { return std::make_unique<benchmark::sorting_workload>(sort_size); });
+            auto setup = [&]() {
+                run_shards(pool, worker_count, shard_count, [&](std::size_t shard) {
+                    workloads[shard]->reset();
                 });
             };
-            elapsed = scorer.add_score("cache_latency", benchmark::run_benchmark(cache_latency_runner, num_runs));
-            std::cout << "Cache latency benchmark completed in " << elapsed << " seconds.\n";
-        }
-        else {
+            auto runner = [&]() {
+                run_shards(pool, worker_count, shard_count, [&](std::size_t shard) {
+                    workloads[shard]->run();
+                });
+            };
+            elapsed = scorer.add_score("sorting", benchmark::run_benchmark(runner, num_runs, setup),
+                                       "input elements", work_product({shard_count,
+                                           static_cast<std::uint64_t>(sort_size)}));
+        } else if (benchmark_name == "memory_bandwidth") {
+            auto workloads = prepare_workloads<benchmark::memory_bandwidth_workload>(
+                pool, worker_count, shard_count, [&](std::size_t shard) {
+                    return std::make_unique<benchmark::memory_bandwidth_workload>(
+                        static_cast<std::size_t>(iterations_by_shard[shard]) * 8);
+                });
+            auto runner = [&]() {
+                run_shards(pool, worker_count, shard_count, [&](std::size_t shard) {
+                    workloads[shard]->run();
+                });
+            };
+            elapsed = scorer.add_score("memory_bandwidth", benchmark::run_benchmark(runner, num_runs),
+                                       "elements processed", work_product({total_effective, 8}));
+        } else if (benchmark_name == "pointer_chase" || benchmark_name == "pointer") {
+            auto workloads = prepare_workloads<benchmark::pointer_chase_workload>(
+                pool, worker_count, shard_count, [&](std::size_t shard) {
+                    return std::make_unique<benchmark::pointer_chase_workload>(
+                        static_cast<std::size_t>(iterations_by_shard[shard]));
+                });
+            auto runner = [&]() {
+                run_shards(pool, worker_count, shard_count, [&](std::size_t shard) {
+                    workloads[shard]->run();
+                });
+            };
+            elapsed = scorer.add_score("pointer_chase", benchmark::run_benchmark(runner, num_runs),
+                                       "pointer hops", total_effective);
+        } else if (benchmark_name == "cache_latency" || benchmark_name == "cache") {
+            constexpr std::size_t stride = 16;
+            auto runner = [&]() {
+                run_shards(pool, worker_count, shard_count, [&](std::size_t shard) {
+                    benchmark::cache_latency_benchmark(
+                        static_cast<std::size_t>(iterations_by_shard[shard]), stride);
+                });
+            };
+            elapsed = scorer.add_score("cache_latency", benchmark::run_benchmark(runner, num_runs),
+                                       "pointer hops", work_product({total_effective, 16}));
+        } else {
             std::cerr << "Unknown benchmark: " << benchmark_name << "\n";
             continue;
         }
 
         total_time += elapsed;
+        std::cout << benchmark_name << " completed in " << elapsed << " seconds.\n";
         std::cout << "Benchmark score: " << scorer.compute_final_score() << "\n";
     }
 
@@ -203,8 +283,7 @@ void benchmark_coordinator::start(const mode& mode)
             case mode::single_threaded:
             {
                 run_benchmark([&](benchmark_coordinator& b) {
-                    return b.run(1, settings_->iterations, settings_->intensity_multiplier,
-                                 settings_->matrix_multiply_size, settings_->num_runs);
+                    return b.run(1);
                 });
                 break;
             }
@@ -212,10 +291,7 @@ void benchmark_coordinator::start(const mode& mode)
             case mode::multi_threaded:
             {
                 run_benchmark([&](benchmark_coordinator& b) {
-                    const int iterations_per_thread = settings_->iterations / settings_->thread_count;
-                    return b.run(settings_->thread_count, iterations_per_thread,
-                                 settings_->intensity_multiplier, settings_->matrix_multiply_size,
-                                 settings_->num_runs);
+                    return b.run(settings_->thread_count);
                 });
                 break;
             }
@@ -224,14 +300,10 @@ void benchmark_coordinator::start(const mode& mode)
             default:
             {
                 run_benchmark([&](benchmark_coordinator& b) {
-                    return b.run(1, settings_->iterations, settings_->intensity_multiplier,
-                                 settings_->matrix_multiply_size, settings_->num_runs);
+                    return b.run(1);
                 });
                 run_benchmark([&](benchmark_coordinator& b) {
-                    const int iterations_per_thread = settings_->iterations / settings_->thread_count;
-                    return b.run(settings_->thread_count, iterations_per_thread,
-                                 settings_->intensity_multiplier, settings_->matrix_multiply_size,
-                                 settings_->num_runs);
+                    return b.run(settings_->thread_count);
                 });
                 break;
             }
@@ -263,8 +335,8 @@ void benchmark_coordinator::start_with_profile(const std::vector<std::string>& b
 
             case mode::multi_threaded:
             {
-                const int iterations_per_thread = settings_->iterations / settings_->thread_count;
-                report_.add_score(run_specific_benchmarks(benchmark_names, settings_->thread_count, iterations_per_thread));
+                report_.add_score(run_specific_benchmarks(benchmark_names, settings_->thread_count,
+                                                         settings_->iterations));
                 break;
             }
 
@@ -275,143 +347,19 @@ void benchmark_coordinator::start_with_profile(const std::vector<std::string>& b
                 report_.add_score(run_specific_benchmarks(benchmark_names, 1, settings_->iterations));
 
                 std::cout << "\n=== Multi-threaded Mode ===\n";
-                const int iterations_per_thread = settings_->iterations / settings_->thread_count;
-                report_.add_score(run_specific_benchmarks(benchmark_names, settings_->thread_count, iterations_per_thread));
+                report_.add_score(run_specific_benchmarks(benchmark_names, settings_->thread_count,
+                                                         settings_->iterations));
                 break;
             }
         }
     }
 }
 
-std::vector<score> benchmark_coordinator::run(const int num_threads, int iterations_per_thread, const int intensity_multiplier, const int matrix_multiply_size, const int num_runs) {
-    report_.set_active_thread_count(num_threads);
-    scorer scorer;
-    scorer.load_weights(settings_->weights);
-    scorer.load_baseline_times(settings_->baseline_times);
-    iterations_per_thread *= intensity_multiplier;
-
-    benchmark_thread_pool pool(num_threads);
-
-    // Run floating-point benchmark first
-    auto float_runner = [&]() {
-        pool.run_all([&]() {
-            benchmark::floating_point_benchmark(iterations_per_thread);
-        });
+std::vector<score> benchmark_coordinator::run(int num_threads) {
+    static const std::vector<std::string> all_benchmarks = {
+        "floating_point", "integer_arithmetic", "matrix_multiply",
+        "branch_prediction", "n_body", "sorting", "memory_bandwidth",
+        "pointer_chase", "cache_latency"
     };
-
-    double elapsed_float = scorer.add_score("floating_point", benchmark::run_benchmark(float_runner, num_runs));
-    std::cout << "Floating-point benchmark completed in " << elapsed_float << " seconds.\n";
-
-    // Integer arithmetic benchmark 
-    auto int_runner = [&]() {
-        pool.run_all([&]() {
-            benchmark::integer_arithmetic_benchmark(iterations_per_thread);
-        });
-    };
-
-    double elapsed_int = scorer.add_score("integer", benchmark::run_benchmark(int_runner, num_runs));
-    std::cout << "Integer arithmetic benchmark completed in " << elapsed_int << " seconds.\n";
-
-    //Matrix Multiplication Benchmark
-    int matrix_size = static_cast<int>(matrix_multiply_size * std::sqrt(static_cast<double>(intensity_multiplier)));
-    auto matrix_runner = [&]() {
-        pool.run_all([&]() {
-            benchmark::matrix_multiply_benchmark(matrix_size);
-        });
-    };
-
-    double elapsed_matrix = scorer.add_score("matrix_multiply", benchmark::run_benchmark(matrix_runner, num_runs));
-    std::cout << "Matrix multiply benchmark completed in " << elapsed_matrix << " seconds.\n";
-
-    //Branch Prediction Benchmark
-    auto branch_runner = [&]() {
-        pool.run_all([&]() {
-            benchmark::branch_prediction_benchmark(iterations_per_thread);
-        });
-    };
-
-    double elapsed_branch = scorer.add_score("branch", benchmark::run_benchmark(branch_runner, num_runs));
-    std::cout << "Branch prediction benchmark completed in " << elapsed_branch << " seconds.\n";
-
-    //Nbody Benchmark
-    int steps = 10;
-    int bodies = static_cast<int>(std::sqrt(iterations_per_thread));
-
-    auto nbody_runner = [&]() {
-        pool.run_all([&]() {
-            benchmark::n_body_benchmark(bodies, steps);
-        });
-    };
-
-    double elapsed_nbody = scorer.add_score("n_body", benchmark::run_benchmark(nbody_runner, num_runs));
-    std::cout << "NBody benchmark completed in " << elapsed_nbody << " seconds.\n";
-
-    //Sorting Benchmark
-    double elapsed_sort = 0.0;
-    {
-        int sort_size = 50000 * static_cast<int>(std::sqrt(intensity_multiplier));
-        auto sort_workloads = prepare_workloads<benchmark::sorting_workload>(pool, num_threads, sort_size);
-        auto reset_sort = [&]() {
-            pool.run_all_indexed([&](std::size_t index) { sort_workloads[index]->reset(); });
-        };
-        auto sort_runner = [&]() {
-            pool.run_all_indexed([&](std::size_t index) { sort_workloads[index]->run(); });
-        };
-
-        elapsed_sort = scorer.add_score("sorting", benchmark::run_benchmark(sort_runner, num_runs, reset_sort));
-        std::cout << "Sorting benchmark completed in " << elapsed_sort << " seconds.\n";
-    }
-
-    // Memory Bandwidth Benchmark 
-    double elapsed_memory = 0.0;
-    {
-        std::size_t mem_size = static_cast<std::size_t>(iterations_per_thread) * 8;
-        auto memory_workloads = prepare_workloads<benchmark::memory_bandwidth_workload>(pool, num_threads, mem_size);
-
-        auto memory_runner = [&]() {
-            pool.run_all_indexed([&](std::size_t index) { memory_workloads[index]->run(); });
-        };
-
-        elapsed_memory = scorer.add_score("memory_bandwidth", benchmark::run_benchmark(memory_runner, num_runs));
-        std::cout << "Memory bandwidth benchmark completed in " << elapsed_memory << " seconds.\n";
-    }
-
-    // Pointer Chasing Benchmark
-    double elapsed_chase = 0.0;
-    {
-        std::size_t chase_size = static_cast<std::size_t>(iterations_per_thread);
-        auto pointer_workloads = prepare_workloads<benchmark::pointer_chase_workload>(pool, num_threads, chase_size);
-
-        auto pointer_chase_runner = [&]() {
-            pool.run_all_indexed([&](std::size_t index) { pointer_workloads[index]->run(); });
-        };
-
-        elapsed_chase = scorer.add_score("pointer_chase", benchmark::run_benchmark(pointer_chase_runner, num_runs));
-        std::cout << "Pointer chase benchmark completed in " << elapsed_chase << " seconds.\n";
-    }
-
-    // Cache Latency Benchmark
-    std::size_t cache_size  = static_cast<std::size_t>(iterations_per_thread);
-    std::size_t cache_stride = 16; 
-
-    auto cache_latency_runner = [&]() {
-        pool.run_all([&]() {
-            benchmark::cache_latency_benchmark(cache_size, cache_stride);
-        });
-    };
-
-    double elapsed_cache = scorer.add_score("cache_latency", benchmark::run_benchmark(cache_latency_runner, num_runs));
-
-    std::cout << "Cache latency benchmark completed in "
-            << elapsed_cache << " seconds.\n";
-
-
-    // Return total duration
-    double total_time = elapsed_float + elapsed_int + elapsed_matrix + elapsed_branch + elapsed_nbody + elapsed_sort + elapsed_memory + elapsed_chase + elapsed_cache;
-    const std::string thread_label = (num_threads > 1) ? "multi-threaded" : "single-threaded";
-    std::cout << "Total " << thread_label << " benchmark time: " << total_time << " seconds.\n";
-
-    std::vector<score> scores = scorer.get_scores();
-    scores.emplace_back("Combined", scorer.compute_final_score(), 0.0);
-    return scores;
+    return run_specific_benchmarks(all_benchmarks, num_threads, settings_->iterations);
 }

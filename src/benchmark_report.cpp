@@ -8,9 +8,12 @@
 #include <map>
 #include <numeric>
 #include <algorithm>
+#include <cmath>
 #include <sstream>
 #include <thread>
 #include <utility>
+#include <unordered_set>
+#include <functional>
 
 #if defined(_WIN32)
 #include <intrin.h>
@@ -212,6 +215,39 @@ benchmark_report::benchmark_report() {
     logical_cpu_cores_ = std::thread::hardware_concurrency();
 }
 
+void benchmark_report::set_run_configuration(
+    const Settings& settings, const std::vector<std::string>& benchmark_names,
+    int active_thread_count) {
+    active_thread_count_ = active_thread_count;
+    run_configuration_ = {
+        {"measurementVersion", measurement_version},
+        {"activeThreads", active_thread_count},
+        {"logicalShards", std::min(settings.thread_count, settings.iterations)},
+        {"iterations", settings.iterations},
+        {"intensityMultiplier", settings.intensity_multiplier},
+        {"matrixMultiplySize", settings.matrix_multiply_size},
+        {"numRuns", settings.num_runs},
+        {"repeatCount", settings.repeat_count},
+        {"profileName", settings.profile.benchmarks.empty() ? "full_suite" : settings.profile.name},
+        {"os", os_info},
+        {"benchmarks", benchmark_names},
+        {"weights", settings.weights},
+        {"baselineTimes", settings.baseline_times},
+        {"build", {
+            {"type", CPUBENCHMARK_BUILD_TYPE},
+            {"compilerPath", CPUBENCHMARK_COMPILER_PATH},
+            {"compilerId", CPUBENCHMARK_COMPILER_ID},
+            {"compilerVersion", CPUBENCHMARK_COMPILER_VERSION},
+            {"commonFlags", CPUBENCHMARK_COMMON_FLAGS},
+            {"debugFlags", CPUBENCHMARK_DEBUG_FLAGS},
+            {"releaseFlags", CPUBENCHMARK_RELEASE_FLAGS},
+            {"relWithDebInfoFlags", CPUBENCHMARK_RELWITHDEBINFO_FLAGS},
+            {"minSizeRelFlags", CPUBENCHMARK_MINSIZEREL_FLAGS},
+            {"cppStandard", 20}
+        }}
+    };
+}
+
 // Getters
 const std::vector<score>& benchmark_report::get_benchmark_scores() const {
     return benchmark_scores_;
@@ -252,6 +288,16 @@ double benchmark_report::get_combined_score() const {
 // Add scores (append)
 void benchmark_report::add_score(const std::vector<score>& benchmarks) {
     try{
+        if (!run_configuration_.is_object()) {
+            run_configuration_ = nlohmann::json::object();
+        }
+        for (const auto& result : benchmarks) {
+            if (result.benchmark_name_ != "Combined" && !result.work_unit_.empty()) {
+                run_configuration_["workloads"][result.benchmark_name_] = {
+                    {"totalWork", result.total_work_}, {"workUnit", result.work_unit_}
+                };
+            }
+        }
         benchmark_scores_.insert(
             benchmark_scores_.end(),
             benchmarks.begin(),
@@ -369,196 +415,146 @@ bool benchmark_report::are_systems_similar(const std::string& cpu1, const std::s
     return cpu_similar && ram_similar;
 }
 
-// Compare with previous benchmark runs
+// Compare with the newest run that used the same workload and build configuration.
 bool benchmark_report::compare_with_previous(const std::string& save_folder, const std::string& mode_type,
                                              const std::string& current_report_file) const {
-    try {
-        std::vector<std::string> previous_files;
-        
-        // Find all previous benchmark files in the folder
-        if (std::filesystem::exists(save_folder)) {
-            for (const auto& entry : std::filesystem::directory_iterator(save_folder)) {
-                if (entry.is_regular_file()) {
-                    std::error_code ec;
-                    if (std::filesystem::equivalent(entry.path(), current_report_file, ec) && !ec) {
-                        continue;
-                    }
-                    std::string filename = entry.path().filename().string();
-                    // Match files that start with "benchmark_scores"
-                    if (filename.find("benchmark_scores") != std::string::npos && 
-                        filename.find(".txt") != std::string::npos) {
-                        previous_files.push_back(entry.path().string());
-                    }
-                }
-            }
+    if (!run_configuration_.is_object()) {
+        return false;
+    }
+
+    struct saved_run {
+        std::string cpu;
+        std::string ram;
+        std::string configuration;
+        std::map<std::string, std::vector<double>> times;
+        std::map<std::string, std::vector<double>> scores;
+    };
+
+    std::map<std::string, std::vector<double>> current_times;
+    std::map<std::string, std::vector<double>> current_scores;
+    std::unordered_set<std::string> benchmark_names;
+    for (const auto& result : benchmark_scores_) {
+        if (result.benchmark_name_ != "Combined") {
+            benchmark_names.insert(result.benchmark_name_);
+            current_times[result.benchmark_name_].push_back(result.time_);
+            current_scores[result.benchmark_name_].push_back(result.score_);
         }
-        
-        if (previous_files.empty()) {
-            std::cout << "No previous benchmark files found for comparison.\n";
+    }
+
+    const auto parse_file = [&](const std::string& path, saved_run& run) {
+        std::ifstream input(path);
+        if (!input) {
             return false;
         }
-        
-        std::cout << "\n==========================================\n";
-        std::cout << "COMPARISON WITH PREVIOUS RUNS (" << mode_type << ")\n";
-        std::cout << "==========================================\n\n";
-        
-        // Get current CPU and RAM info
-        std::string current_cpu = collect_cpu_name();
-        std::string current_ram = collect_ram_info();
-        
-        std::cout << "Current System:\n";
-        std::cout << "  CPU: " << current_cpu << "\n";
-        std::cout << "  RAM: " << current_ram << "\n\n";
-        
-        // Sort files by timestamp (newest first) and take only the last one
-        std::sort(previous_files.begin(), previous_files.end(),
-            [](const std::string& a, const std::string& b) {
-                return a > b; // Lexicographic sort, newest first
-            });
-        
-        // Only compare with the most recent run
-        if (!previous_files.empty()) {
-            const std::string& latest_file = previous_files[0];
-            
-            std::ifstream prev_file_stream(latest_file);
-            if (!prev_file_stream.is_open()) {
-                std::cout << "Could not open previous file: " << latest_file << "\n\n";
-                return false;
-            }
-            
-            // Read system information and the multi-line benchmark sections written by write_txt.
-            std::string line;
-            std::string prev_cpu = "Unknown";
-            std::string prev_ram = "Unknown";
-            int prev_measurement_version = 0;
-            std::map<std::string, std::vector<double>> prev_times;
-            std::map<std::string, std::vector<double>> prev_scores;
-            std::string candidate_name;
-            std::string current_benchmark;
-
-            while (std::getline(prev_file_stream, line)) {
+        std::string line;
+        std::string current_benchmark;
+        try {
+            while (std::getline(input, line)) {
                 if (line.starts_with("CPU: ")) {
-                    prev_cpu = line.substr(5);
+                    run.cpu = line.substr(5);
                 } else if (line.starts_with("RAM: ")) {
-                    prev_ram = line.substr(5);
-                } else if (line.starts_with("Measurement Version: ")) {
-                    prev_measurement_version = std::stoi(line.substr(std::string("Measurement Version: ").size()));
-                } else if (line.find("Score: ") == 0 && !candidate_name.empty()) {
-                    try {
-                        prev_scores[candidate_name].push_back(std::stod(line.substr(7)));
-                        current_benchmark = candidate_name;
-                    } catch (const std::exception&) {
-                        current_benchmark.clear();
-                    }
-                } else if (line.find("Time (mean): ") == 0 && !current_benchmark.empty()) {
-                    try {
-                        prev_times[current_benchmark].push_back(std::stod(line.substr(13)));
-                    } catch (const std::exception&) {
-                        // Ignore malformed time fields while retaining other valid benchmark sections.
-                    }
-                } else if (!line.empty() && line.find("-") != 0 && line.find("=") != 0 &&
-                           line.find("Suite Repetition:") != 0 &&
-                           line.find("Min:") != 0 && line.find("Max:") != 0 &&
-                           line.find("Median:") != 0 &&
-                           line.find("Std Dev:") != 0 && line.find("P95:") != 0 &&
-                           line.find("P99:") != 0 && line.find("Sample Count:") != 0 &&
-                           line.find("Note:") != 0 && line != "COMBINED SCORE") {
-                    candidate_name = line;
+                    run.ram = line.substr(5);
+                } else if (line.starts_with("Run Configuration: ")) {
+                    run.configuration = line.substr(std::string("Run Configuration: ").size());
+                } else if (line == "COMBINED SCORE") {
+                    current_benchmark.clear();
+                } else if (benchmark_names.contains(line)) {
+                    current_benchmark = line;
+                } else if (line.starts_with("Score: ") && !current_benchmark.empty()) {
+                    run.scores[current_benchmark].push_back(std::stod(line.substr(7)));
+                } else if (line.starts_with("Time (mean): ") && !current_benchmark.empty()) {
+                    run.times[current_benchmark].push_back(std::stod(line.substr(13)));
                 }
             }
-            prev_file_stream.close();
-
-            if (prev_measurement_version != measurement_version) {
-                std::cout << "Skipping comparison (measurement method changed)\n\n";
-                return false;
-            }
-            
-            // Check if systems are similar
-            bool systems_similar = are_systems_similar(current_cpu, current_ram, prev_cpu, prev_ram);
-            
-            std::cout << "------------------------------------------\n";
-            std::cout << "Previous Run: " << latest_file << "\n";
-            std::cout << "------------------------------------------\n";
-            std::cout << "Previous System:\n";
-            std::cout << "  CPU: " << prev_cpu << "\n";
-            std::cout << "  RAM: " << prev_ram << "\n";
-            std::cout << "Systems Similar: " << (systems_similar ? "YES" : "NO") << "\n\n";
-            
-            if (!systems_similar) {
-                std::cout << "Skipping comparison (different hardware)\n\n";
-                return false;
-            }
-            
-            // Compare each benchmark
-            std::cout << "Benchmark Comparison:\n";
-            std::cout << std::left << std::setw(20) << "Benchmark" 
-                      << std::right << " | Prev Time (s)" 
-                      << " | Curr Time (s)" 
-                      << " | Improvement\n";
-            std::cout << std::string(80, '-') << "\n";
-            
-            for (const auto& s : get_benchmark_scores()) {
-                if (s.benchmark_name_ == "Combined") continue;
-                
-                // Get current time for all benchmarks
-                double current_time_val = s.time_;
-                
-                auto it = prev_times.find(s.benchmark_name_);
-                if (it != prev_times.end() && !it->second.empty()) {
-                    // Calculate average previous time
-                    double prev_avg = std::accumulate(it->second.begin(), it->second.end(), 0.0) / 
-                                      static_cast<double>(it->second.size());
-                    
-                    double improvement = ((prev_avg - current_time_val) / prev_avg) * 100.0;
-                    
-                    std::cout << std::left << std::setw(20) << s.benchmark_name_
-                              << std::right << " | " << std::fixed << std::setprecision(4) << prev_avg
-                              << " | " << std::fixed << std::setprecision(4) << current_time_val
-                              << " | " << (improvement >= 0 ? "+" : "") << std::fixed << std::setprecision(2) << improvement << "%\n";
-                } else {
-                    std::cout << std::left << std::setw(20) << s.benchmark_name_
-                              << std::right << " | N/A | " << std::fixed << std::setprecision(4) << current_time_val
-                              << " | N/A\n";
-                }
-            }
-            
-            std::cout << "\n";
-            std::cout << "Score Comparison:\n";
-            std::cout << std::left << std::setw(20) << "Benchmark" 
-                      << std::right << " | Prev Score" 
-                      << " | Curr Score" 
-                      << " | Change\n";
-            std::cout << std::string(80, '-') << "\n";
-            
-            for (const auto& s : get_benchmark_scores()) {
-                if (s.benchmark_name_ == "Combined") continue;
-                
-                auto it = prev_scores.find(s.benchmark_name_);
-                if (it != prev_scores.end() && !it->second.empty()) {
-                    // Calculate average previous score
-                    double prev_avg_score = std::accumulate(it->second.begin(), it->second.end(), 0.0) / 
-                                           static_cast<double>(it->second.size());
-                    
-                    double current_score = s.score_;
-                    double score_change = ((current_score - prev_avg_score) / prev_avg_score) * 100.0;
-                    
-                    std::cout << std::left << std::setw(20) << s.benchmark_name_
-                              << std::right << " | " << std::fixed << std::setprecision(2) << prev_avg_score
-                              << " | " << std::fixed << std::setprecision(2) << current_score
-                              << " | " << (score_change >= 0 ? "+" : "") << std::fixed << std::setprecision(2) << score_change << "%\n";
-                } else {
-                    std::cout << std::left << std::setw(20) << s.benchmark_name_
-                              << std::right << " | N/A | " << std::fixed << std::setprecision(2) << s.score_
-                              << " | N/A\n";
-                }
-            }
-            
-            std::cout << "\n";
+        } catch (const std::exception&) {
+            return false;
         }
-        
         return true;
-    } catch (const std::exception& e) {
-        std::cerr << "Error during comparison: " << e.what() << "\n";
+    };
+
+    try {
+        std::vector<std::string> previous_files;
+        if (std::filesystem::exists(save_folder)) {
+            for (const auto& entry : std::filesystem::directory_iterator(save_folder)) {
+                if (!entry.is_regular_file()) {
+                    continue;
+                }
+                std::error_code ec;
+                if (std::filesystem::equivalent(entry.path(), current_report_file, ec) && !ec) {
+                    continue;
+                }
+                const std::string filename = entry.path().filename().string();
+                if (filename.starts_with("benchmark_scores_") && entry.path().extension() == ".txt") {
+                    previous_files.push_back(entry.path().string());
+                }
+            }
+        }
+        std::sort(previous_files.begin(), previous_files.end(), std::greater<>());
+
+        saved_run previous;
+        std::string previous_path;
+        const std::string current_configuration = run_configuration_.dump();
+        for (const auto& path : previous_files) {
+            saved_run candidate;
+            if (!parse_file(path, candidate) || candidate.configuration != current_configuration ||
+                candidate.cpu != cpuname || candidate.ram != ram_info) {
+                continue;
+            }
+            bool complete = true;
+            for (const auto& name : benchmark_names) {
+                if (candidate.times[name].size() != current_times.at(name).size() ||
+                    candidate.scores[name].size() != current_scores.at(name).size() ||
+                    std::any_of(candidate.times[name].begin(), candidate.times[name].end(),
+                        [](double value) { return !std::isfinite(value) || value <= 0.0; }) ||
+                    std::any_of(candidate.scores[name].begin(), candidate.scores[name].end(),
+                        [](double value) { return !std::isfinite(value) || value <= 0.0; })) {
+                    complete = false;
+                    break;
+                }
+            }
+            if (complete) {
+                previous = std::move(candidate);
+                previous_path = path;
+                break;
+            }
+        }
+
+        if (previous_path.empty()) {
+            std::cout << "No comparable previous run for " << mode_type
+                      << " (workload, threads, profile, build, or hardware differs).\n";
+            return false;
+        }
+
+        const auto average = [](const std::vector<double>& values) {
+            return std::accumulate(values.begin(), values.end(), 0.0) /
+                   static_cast<double>(values.size());
+        };
+        const auto format = [](double value, int precision) {
+            std::ostringstream output;
+            output << std::fixed << std::setprecision(precision) << value;
+            return output.str();
+        };
+
+        std::cout << "\nComparison with " << previous_path << " (" << mode_type << ")\n";
+        std::cout << "Benchmark | Previous (s) | Current (s) | Improvement\n";
+        for (const auto& [name, values] : current_times) {
+            const double before = average(previous.times.at(name));
+            const double now = average(values);
+            const double improvement = (before - now) / before * 100.0;
+            std::cout << name << " | " << format(before, 9) << " | " << format(now, 9)
+                      << " | " << (improvement >= 0.0 ? "+" : "") << format(improvement, 2) << "%\n";
+        }
+        std::cout << "Score change\n";
+        for (const auto& [name, values] : current_scores) {
+            const double before = average(previous.scores.at(name));
+            const double now = average(values);
+            const double change = (now - before) / before * 100.0;
+            std::cout << name << " | " << format(before, 2) << " | " << format(now, 2)
+                      << " | " << (change >= 0.0 ? "+" : "") << format(change, 2) << "%\n";
+        }
+        return true;
+    } catch (const std::exception& error) {
+        std::cerr << "Error during comparison: " << error.what() << "\n";
         return false;
     }
 }

@@ -26,6 +26,22 @@ set(SOURCE_FILES
 
 add_executable(CPUBenchmark ${SOURCE_FILES})
 
+function(set_build_metadata target_name)
+    target_compile_definitions(${target_name} PRIVATE
+        CPUBENCHMARK_BUILD_TYPE="$<CONFIG>"
+        CPUBENCHMARK_COMPILER_PATH="${CMAKE_CXX_COMPILER}"
+        CPUBENCHMARK_COMPILER_ID="${CMAKE_CXX_COMPILER_ID}"
+        CPUBENCHMARK_COMPILER_VERSION="${CMAKE_CXX_COMPILER_VERSION}"
+        CPUBENCHMARK_COMMON_FLAGS="${CMAKE_CXX_FLAGS}"
+        CPUBENCHMARK_DEBUG_FLAGS="${CMAKE_CXX_FLAGS_DEBUG}"
+        CPUBENCHMARK_RELEASE_FLAGS="${CMAKE_CXX_FLAGS_RELEASE}"
+        CPUBENCHMARK_RELWITHDEBINFO_FLAGS="${CMAKE_CXX_FLAGS_RELWITHDEBINFO}"
+        CPUBENCHMARK_MINSIZEREL_FLAGS="${CMAKE_CXX_FLAGS_MINSIZEREL}"
+    )
+endfunction()
+
+set_build_metadata(CPUBenchmark)
+
 find_package(Boost 1.71.0 CONFIG COMPONENTS program_options)
 
 find_package(nlohmann_json REQUIRED)
@@ -41,12 +57,16 @@ include(CTest)
 if(BUILD_TESTING)
     add_executable(CPUBenchmarkTests
         tests/test_main.cpp
+        src/benchmark.cpp
+        src/benchmark_coordinator.cpp
         src/scorer.cpp
         src/benchmark_report.cpp
         src/file_manager.cpp
+        src/thread_affinity.cpp
     )
+    set_build_metadata(CPUBenchmarkTests)
     target_include_directories(CPUBenchmarkTests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
-    target_link_libraries(CPUBenchmarkTests PRIVATE nlohmann_json::nlohmann_json)
+    target_link_libraries(CPUBenchmarkTests PRIVATE nlohmann_json::nlohmann_json Threads::Threads)
 
     add_test(
         NAME CPUBenchmarkTests
