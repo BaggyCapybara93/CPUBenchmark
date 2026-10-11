@@ -99,8 +99,7 @@ num_runs=3
 - `cache_size_sweep` - Random cache-line pointer chasing from 4 KiB through 32 MiB by default
 - `integer_add`, `integer_multiply`, `integer_divide` - Basic unsigned 32-bit integer kernels
 - `floating_add`, `floating_multiply`, `floating_divide` - Basic double-precision kernels
-
-The six arithmetic kernels are available in profiles and are not part of the default full suite, so existing default scores retain their benchmark mix. Each uses eight independent accumulator lanes and cache-resident, deterministic operands. The integer divide kernel varies its dividend from the accumulator to keep the division in each loop iteration; its reported work count includes divisions, while the accumulator update is overhead. Floating-point factors are paired with reciprocals so long multiply and divide runs remain finite. Work counts are rounded up to whole groups of eight operations per shard. Results include loop, input-load, and thread-dispatch overhead, and Release builds may auto-vectorize them. Use them for relative comparisons with the same build and profile rather than as isolated instruction latency measurements.
+- `floating_fma` - Double-precision fused multiply-add kernel
 
 The two branch kernels are profile-only and use the same number of decisions and taken branches per shard. `branch_predictable` repeats a short alternating pattern; `branch_unpredictable` shuffles the same values with a fixed seed. Pattern generation happens before timing, and a conditional volatile update keeps the branch in optimized builds. Compare their mean time or throughput with the same build, thread count, and profile. The timings also include input loads and the conditional update, so they are a workload comparison rather than a direct branch-misprediction counter. The existing `branch_prediction` benchmark remains in the default suite with its original measurement method.
 
@@ -135,7 +134,7 @@ For example, a profile can select only these kernels:
 
 ```text
 name=arithmetic
-benchmarks=integer_add,integer_multiply,integer_divide,floating_add,floating_multiply,floating_divide
+benchmarks=integer_add,integer_multiply,integer_divide,floating_add,floating_multiply,floating_divide,floating_fma
 iterations=100000000
 repeat_count=1
 intensity_multiplier=1

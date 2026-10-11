@@ -85,7 +85,8 @@ struct Settings{
         "integer_divide",
         "floating_add",
         "floating_multiply",
-        "floating_divide"
+        "floating_divide",
+        "floating_fma"
     };
     benchmark_profile profile;
 };

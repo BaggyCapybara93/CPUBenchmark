@@ -13,7 +13,7 @@
 #include <array>
 #include <cstdint>
 
-enum class arithmetic_operation { add, multiply, divide };
+enum class arithmetic_operation { add, multiply, divide, fma };
 enum class branch_pattern { predictable, unpredictable };
 
 class benchmark {
@@ -39,6 +39,7 @@ public:
         int iterations_;
         arithmetic_operation operation_;
         std::array<double, 256> operands_{};
+        std::array<double, 256> addends_{};
     };
 
     struct branch_pattern_workload {

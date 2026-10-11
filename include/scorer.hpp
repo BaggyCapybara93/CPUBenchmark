@@ -93,7 +93,8 @@ private:
         {"integer_divide",  0.05},
         {"floating_add",    0.05},
         {"floating_multiply",0.05},
-        {"floating_divide", 0.05}
+        {"floating_divide", 0.05},
+        {"floating_fma",    0.05}
     };
 
     std::unordered_map<std::string, double> baseline_times_ = {
@@ -114,6 +115,7 @@ private:
         {"floating_add",    0.020},
         {"floating_multiply",0.020},
         {"floating_divide", 0.020},
+        {"floating_fma",    0.020},
         {"combined",         0.150}
     };
 

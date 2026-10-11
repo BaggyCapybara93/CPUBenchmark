@@ -66,6 +66,8 @@ std::uint32_t benchmark::integer_kernel_workload::run() const {
                 [](std::uint32_t value, std::uint32_t operand, std::uint32_t numerator) {
                     return value + (numerator + (value & 1023U)) / operand;
                 });
+        case arithmetic_operation::fma:
+            throw std::invalid_argument("FMA requires a floating-point workload");
     }
     throw std::invalid_argument("Unknown arithmetic operation");
 }
@@ -79,6 +81,9 @@ benchmark::floating_kernel_workload::floating_kernel_workload(
             const double factor = 1.0 + static_cast<double>((block / 2 + lane) % 127U + 1U) * 1e-7;
             operands_[block * arithmetic_lanes + lane] = factor;
             operands_[(block + 1) * arithmetic_lanes + lane] = 1.0 / factor;
+            const double addend = static_cast<double>(lane + 1) * 1e-4;
+            addends_[block * arithmetic_lanes + lane] = addend;
+            addends_[(block + 1) * arithmetic_lanes + lane] = -addend;
         }
     }
 }
@@ -94,6 +99,11 @@ double benchmark::floating_kernel_workload::run() const {
         case arithmetic_operation::divide:
             return run_arithmetic_kernel(iterations_, operands_, operands_,
                 [](double value, double operand, double) { return value / operand; });
+        case arithmetic_operation::fma:
+            return run_arithmetic_kernel(iterations_, operands_, addends_,
+                [](double value, double operand, double addend) {
+                    return std::fma(value, operand, addend);
+                });
     }
     throw std::invalid_argument("Unknown arithmetic operation");
 }

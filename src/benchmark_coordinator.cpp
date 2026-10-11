@@ -59,7 +59,8 @@ bool is_integer_kernel(const std::string& name) {
 }
 
 bool is_floating_kernel(const std::string& name) {
-    return name == "floating_add" || name == "floating_multiply" || name == "floating_divide";
+    return name == "floating_add" || name == "floating_multiply" ||
+           name == "floating_divide" || name == "floating_fma";
 }
 
 bool is_branch_pattern(const std::string& name) {
@@ -210,7 +211,9 @@ std::vector<score> benchmark_coordinator::run_specific_benchmarks(
             const arithmetic_operation operation = benchmark_name.ends_with("_add")
                 ? arithmetic_operation::add
                 : benchmark_name.ends_with("_multiply")
-                    ? arithmetic_operation::multiply : arithmetic_operation::divide;
+                    ? arithmetic_operation::multiply
+                    : benchmark_name.ends_with("_fma")
+                        ? arithmetic_operation::fma : arithmetic_operation::divide;
             if (is_integer_kernel(benchmark_name)) {
                 auto workloads = prepare_workloads<benchmark::integer_kernel_workload>(
                     pool, worker_count, shard_count, [&](std::size_t shard) {
@@ -236,7 +239,9 @@ std::vector<score> benchmark_coordinator::run_specific_benchmarks(
                     });
                 };
                 elapsed = scorer.add_score(benchmark_name, benchmark::run_benchmark(runner, num_runs),
-                                           "floating-point operations", arithmetic_operations);
+                                           operation == arithmetic_operation::fma
+                                               ? "fused multiply-adds" : "floating-point operations",
+                                           arithmetic_operations);
             }
         } else if (benchmark_name == "matrix_multiply") {
             auto runner = [&]() {

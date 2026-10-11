@@ -112,6 +112,7 @@ void test_arithmetic_kernels() {
     double expected_floating_add = 0.0;
     double expected_floating_multiply = 0.0;
     double expected_floating_divide = 0.0;
+    double expected_floating_fma = 0.0;
     for (std::uint32_t lane = 0; lane < benchmark::arithmetic_lanes; ++lane) {
         const std::uint32_t initial = lane + 1;
         const std::uint32_t operand = 3U + 2U * lane;
@@ -123,6 +124,8 @@ void test_arithmetic_kernels() {
         expected_floating_add += static_cast<double>(initial) + factor;
         expected_floating_multiply += static_cast<double>(initial) * factor;
         expected_floating_divide += static_cast<double>(initial) / factor;
+        expected_floating_fma += std::fma(static_cast<double>(initial), factor,
+                                          static_cast<double>(lane + 1) * 1e-4);
     }
 
     using integer_workload = benchmark::integer_kernel_workload;
@@ -133,10 +136,12 @@ void test_arithmetic_kernels() {
             "integer kernels must perform their named operation");
     require(approximately_equal(floating_workload(1, arithmetic_operation::add).run(), expected_floating_add) &&
                 approximately_equal(floating_workload(1, arithmetic_operation::multiply).run(), expected_floating_multiply) &&
-                approximately_equal(floating_workload(1, arithmetic_operation::divide).run(), expected_floating_divide),
+                approximately_equal(floating_workload(1, arithmetic_operation::divide).run(), expected_floating_divide) &&
+                approximately_equal(floating_workload(1, arithmetic_operation::fma).run(), expected_floating_fma),
             "floating-point kernels must perform their named operation");
     require(std::isfinite(floating_workload(200'000, arithmetic_operation::multiply).run()) &&
-                std::isfinite(floating_workload(200'000, arithmetic_operation::divide).run()),
+                std::isfinite(floating_workload(200'000, arithmetic_operation::divide).run()) &&
+                std::isfinite(floating_workload(200'000, arithmetic_operation::fma).run()),
             "floating-point kernels must remain finite over long runs");
 }
 
@@ -425,7 +430,7 @@ void test_same_work_in_both_modes() {
         "floating_point", "integer_arithmetic", "matrix_multiply", "branch_prediction",
         "n_body", "sorting", "memory_bandwidth", "pointer_chase", "cache_latency",
         "integer_add", "integer_multiply", "integer_divide",
-        "floating_add", "floating_multiply", "floating_divide"
+        "floating_add", "floating_multiply", "floating_divide", "floating_fma"
     };
 
     benchmark_report single;
@@ -467,6 +472,9 @@ void test_same_work_in_both_modes() {
                     single.get_run_configuration().at("baselineTimes").contains(names[i]),
                 "arithmetic kernels must be selectable and report the same measured work in both modes");
     }
+    require(single_scores[names.size() - 1].work_unit_ == "fused multiply-adds" &&
+                multi_scores[names.size() - 1].work_unit_ == "fused multiply-adds",
+            "FMA results must report fused operations as their work unit");
 }
 
 void test_cache_size_sweep() {
