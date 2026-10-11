@@ -8,6 +8,95 @@
 #include <numeric>
 #include <thread>
 
+namespace {
+
+template <typename Value, typename Operation>
+Value run_arithmetic_kernel(
+    int iterations, const std::array<Value, 256>& operands,
+    const std::array<Value, 256>& numerators, Operation operation) {
+    std::array<Value, benchmark::arithmetic_lanes> accumulators{};
+    for (std::size_t lane = 0; lane < accumulators.size(); ++lane) {
+        accumulators[lane] = static_cast<Value>(lane + 1);
+    }
+
+    for (int i = 0; i < iterations; ++i) {
+        const std::size_t offset =
+            (static_cast<std::size_t>(i) % (operands.size() / benchmark::arithmetic_lanes)) *
+            benchmark::arithmetic_lanes;
+        for (std::size_t lane = 0; lane < accumulators.size(); ++lane) {
+            const std::size_t index = offset + lane;
+            accumulators[lane] = operation(accumulators[lane], operands[index], numerators[index]);
+        }
+    }
+
+    Value checksum{};
+    for (Value value : accumulators) checksum += value;
+    escape(checksum);
+    clobber();
+    return checksum;
+}
+
+}  // namespace
+
+benchmark::integer_kernel_workload::integer_kernel_workload(
+    int iterations, arithmetic_operation operation)
+    : iterations_(iterations), operation_(operation) {
+    if (iterations <= 0) throw std::invalid_argument("Arithmetic iterations must be positive");
+    for (std::size_t i = 0; i < operands_.size(); ++i) {
+        operands_[i] = 3U + 2U * static_cast<std::uint32_t>(i % 127U);
+        numerators_[i] = 100'003U + 977U * static_cast<std::uint32_t>(i);
+    }
+}
+
+std::uint32_t benchmark::integer_kernel_workload::run() const {
+    switch (operation_) {
+        case arithmetic_operation::add:
+            return run_arithmetic_kernel(iterations_, operands_, numerators_,
+                [](std::uint32_t value, std::uint32_t operand, std::uint32_t) {
+                    return value + operand;
+                });
+        case arithmetic_operation::multiply:
+            return run_arithmetic_kernel(iterations_, operands_, numerators_,
+                [](std::uint32_t value, std::uint32_t operand, std::uint32_t) {
+                    return value * operand;
+                });
+        case arithmetic_operation::divide:
+            return run_arithmetic_kernel(iterations_, operands_, numerators_,
+                [](std::uint32_t value, std::uint32_t operand, std::uint32_t numerator) {
+                    return value + (numerator + (value & 1023U)) / operand;
+                });
+    }
+    throw std::invalid_argument("Unknown arithmetic operation");
+}
+
+benchmark::floating_kernel_workload::floating_kernel_workload(
+    int iterations, arithmetic_operation operation)
+    : iterations_(iterations), operation_(operation) {
+    if (iterations <= 0) throw std::invalid_argument("Arithmetic iterations must be positive");
+    for (std::size_t block = 0; block < operands_.size() / arithmetic_lanes; block += 2) {
+        for (std::size_t lane = 0; lane < arithmetic_lanes; ++lane) {
+            const double factor = 1.0 + static_cast<double>((block / 2 + lane) % 127U + 1U) * 1e-7;
+            operands_[block * arithmetic_lanes + lane] = factor;
+            operands_[(block + 1) * arithmetic_lanes + lane] = 1.0 / factor;
+        }
+    }
+}
+
+double benchmark::floating_kernel_workload::run() const {
+    switch (operation_) {
+        case arithmetic_operation::add:
+            return run_arithmetic_kernel(iterations_, operands_, operands_,
+                [](double value, double operand, double) { return value + operand; });
+        case arithmetic_operation::multiply:
+            return run_arithmetic_kernel(iterations_, operands_, operands_,
+                [](double value, double operand, double) { return value * operand; });
+        case arithmetic_operation::divide:
+            return run_arithmetic_kernel(iterations_, operands_, operands_,
+                [](double value, double operand, double) { return value / operand; });
+    }
+    throw std::invalid_argument("Unknown arithmetic operation");
+}
+
 void benchmark::floating_point_benchmark(int iterations) {
     double result = 0.0;
     for (int i = 0; i < iterations; ++i) {

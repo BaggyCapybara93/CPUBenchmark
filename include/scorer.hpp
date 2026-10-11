@@ -73,7 +73,13 @@ private:
         {"n_body",         0.15},
         {"memory_bandwidth",0.10},
         {"pointer_chase",   0.10},
-        {"cache_latency",   0.10}
+        {"cache_latency",   0.10},
+        {"integer_add",     0.05},
+        {"integer_multiply",0.05},
+        {"integer_divide",  0.05},
+        {"floating_add",    0.05},
+        {"floating_multiply",0.05},
+        {"floating_divide", 0.05}
     };
 
     std::unordered_map<std::string, double> baseline_times_ = {
@@ -86,6 +92,12 @@ private:
         {"memory_bandwidth",0.025},
         {"pointer_chase",   0.020},
         {"cache_latency",   0.020},
+        {"integer_add",     0.015},
+        {"integer_multiply",0.015},
+        {"integer_divide",  0.015},
+        {"floating_add",    0.020},
+        {"floating_multiply",0.020},
+        {"floating_divide", 0.020},
         {"combined",         0.150}
     };
 

@@ -15,6 +15,7 @@ A simple C++ CPU benchmark tool for measuring system performance.
 - Score calculation and reporting (relative performance metrics)
 - Throughput in recorded work units per second, plus estimated logical GB/s for memory bandwidth
 - RAM capacity, type, and speed in text and JSON reports when available from the OS
+- Optional integer and floating-point add, multiply, and divide kernels
 
 ## Building
 ```bash
@@ -89,6 +90,22 @@ num_runs=3
 - `memory_bandwidth` - Memory bandwidth
 - `pointer_chase` - Pointer chasing
 - `cache_latency` - Cache latency
+- `integer_add`, `integer_multiply`, `integer_divide` - Basic unsigned 32-bit integer kernels
+- `floating_add`, `floating_multiply`, `floating_divide` - Basic double-precision kernels
+
+The six arithmetic kernels are available in profiles and are not part of the default full suite, so existing default scores retain their benchmark mix. Each uses eight independent accumulator lanes and cache-resident, deterministic operands. The integer divide kernel varies its dividend from the accumulator to keep the division in each loop iteration; its reported work count includes divisions, while the accumulator update is overhead. Floating-point factors are paired with reciprocals so long multiply and divide runs remain finite. Work counts are rounded up to whole groups of eight operations per shard. Results include loop, input-load, and thread-dispatch overhead, and Release builds may auto-vectorize them. Use them for relative comparisons with the same build and profile rather than as isolated instruction latency measurements.
+
+For example, a profile can select only these kernels:
+
+```text
+name=arithmetic
+benchmarks=integer_add,integer_multiply,integer_divide,floating_add,floating_multiply,floating_divide
+iterations=100000000
+repeat_count=1
+intensity_multiplier=1
+matrix_multiply_size=128
+num_runs=5
+```
 
 #### Using Profiles
 

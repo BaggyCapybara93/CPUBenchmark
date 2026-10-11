@@ -70,7 +70,13 @@ struct Settings{
         "sorting",
         "memory_bandwidth",
         "pointer_chase",
-        "cache_latency"
+        "cache_latency",
+        "integer_add",
+        "integer_multiply",
+        "integer_divide",
+        "floating_add",
+        "floating_multiply",
+        "floating_divide"
     };
     benchmark_profile profile;
 };

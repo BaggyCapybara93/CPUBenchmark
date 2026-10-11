@@ -105,6 +105,41 @@ void test_run_samples_and_statistics() {
             "aggregate statistics must include samples from every suite repetition");
 }
 
+void test_arithmetic_kernels() {
+    std::uint32_t expected_integer_add = 0;
+    std::uint32_t expected_integer_multiply = 0;
+    std::uint32_t expected_integer_divide = 0;
+    double expected_floating_add = 0.0;
+    double expected_floating_multiply = 0.0;
+    double expected_floating_divide = 0.0;
+    for (std::uint32_t lane = 0; lane < benchmark::arithmetic_lanes; ++lane) {
+        const std::uint32_t initial = lane + 1;
+        const std::uint32_t operand = 3U + 2U * lane;
+        const std::uint32_t numerator = 100'003U + 977U * lane;
+        expected_integer_add += initial + operand;
+        expected_integer_multiply += initial * operand;
+        expected_integer_divide += initial + (numerator + (initial & 1023U)) / operand;
+        const double factor = 1.0 + static_cast<double>(lane + 1) * 1e-7;
+        expected_floating_add += static_cast<double>(initial) + factor;
+        expected_floating_multiply += static_cast<double>(initial) * factor;
+        expected_floating_divide += static_cast<double>(initial) / factor;
+    }
+
+    using integer_workload = benchmark::integer_kernel_workload;
+    using floating_workload = benchmark::floating_kernel_workload;
+    require(integer_workload(1, arithmetic_operation::add).run() == expected_integer_add &&
+                integer_workload(1, arithmetic_operation::multiply).run() == expected_integer_multiply &&
+                integer_workload(1, arithmetic_operation::divide).run() == expected_integer_divide,
+            "integer kernels must perform their named operation");
+    require(approximately_equal(floating_workload(1, arithmetic_operation::add).run(), expected_floating_add) &&
+                approximately_equal(floating_workload(1, arithmetic_operation::multiply).run(), expected_floating_multiply) &&
+                approximately_equal(floating_workload(1, arithmetic_operation::divide).run(), expected_floating_divide),
+            "floating-point kernels must perform their named operation");
+    require(std::isfinite(floating_workload(200'000, arithmetic_operation::multiply).run()) &&
+                std::isfinite(floating_workload(200'000, arithmetic_operation::divide).run()),
+            "floating-point kernels must remain finite over long runs");
+}
+
 void test_profile(const std::string& profile_path) {
     auto settings = std::make_shared<Settings>();
     file_manager manager(settings);
@@ -262,7 +297,9 @@ void test_same_work_in_both_modes() {
     settings->repeat_count = 1;
     const std::vector<std::string> names = {
         "floating_point", "integer_arithmetic", "matrix_multiply", "branch_prediction",
-        "n_body", "sorting", "memory_bandwidth", "pointer_chase", "cache_latency"
+        "n_body", "sorting", "memory_bandwidth", "pointer_chase", "cache_latency",
+        "integer_add", "integer_multiply", "integer_divide",
+        "floating_add", "floating_multiply", "floating_divide"
     };
 
     benchmark_report single;
@@ -295,6 +332,15 @@ void test_same_work_in_both_modes() {
                 single_scores[6].estimated_gb_per_second() &&
                 multi_scores[6].estimated_gb_per_second(),
             "memory bandwidth runs must report estimated logical byte throughput");
+    for (std::size_t i = 9; i < names.size(); ++i) {
+        require(settings->known_benchmarks.contains(names[i]) &&
+                    single_scores[i].total_work_ == 408 &&
+                    multi_scores[i].total_work_ == 408 &&
+                    single_scores[i].work_per_second() && multi_scores[i].work_per_second() &&
+                    single.get_run_configuration().at("weights").contains(names[i]) &&
+                    single.get_run_configuration().at("baselineTimes").contains(names[i]),
+                "arithmetic kernels must be selectable and report the same measured work in both modes");
+    }
 }
 
 }  // namespace
@@ -304,6 +350,7 @@ int main(int argc, char* argv[]) {
         require(argc == 2, "expected a profile fixture path");
         test_scorer();
         test_run_samples_and_statistics();
+        test_arithmetic_kernels();
         test_profile(argv[1]);
         test_report_combined_score();
         test_report_serialization();

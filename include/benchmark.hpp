@@ -10,9 +10,36 @@
 #include <utility>
 #include <vector>
 #include <unordered_map>
+#include <array>
+#include <cstdint>
+
+enum class arithmetic_operation { add, multiply, divide };
 
 class benchmark {
 public:
+    static constexpr std::size_t arithmetic_lanes = 8;
+
+    struct integer_kernel_workload {
+        integer_kernel_workload(int iterations, arithmetic_operation operation);
+        std::uint32_t run() const;
+
+    private:
+        int iterations_;
+        arithmetic_operation operation_;
+        std::array<std::uint32_t, 256> operands_{};
+        std::array<std::uint32_t, 256> numerators_{};
+    };
+
+    struct floating_kernel_workload {
+        floating_kernel_workload(int iterations, arithmetic_operation operation);
+        double run() const;
+
+    private:
+        int iterations_;
+        arithmetic_operation operation_;
+        std::array<double, 256> operands_{};
+    };
+
     struct sorting_workload {
         explicit sorting_workload(int size);
         void reset();

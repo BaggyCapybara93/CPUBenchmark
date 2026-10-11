@@ -5,6 +5,7 @@
 #include <limits>
 #include <stdexcept>
 #include <initializer_list>
+#include <string>
 
 //Threading
 void benchmark_thread_pool::run_all(const std::function<void()>& fn) {
@@ -52,6 +53,14 @@ void benchmark_thread_pool::worker_loop(std::size_t worker_index) {
 }
 
 namespace {
+bool is_integer_kernel(const std::string& name) {
+    return name == "integer_add" || name == "integer_multiply" || name == "integer_divide";
+}
+
+bool is_floating_kernel(const std::string& name) {
+    return name == "floating_add" || name == "floating_multiply" || name == "floating_divide";
+}
+
 std::uint64_t work_product(std::initializer_list<std::uint64_t> factors) {
     std::uint64_t product = 1;
     for (std::uint64_t factor : factors) {
@@ -101,10 +110,17 @@ std::vector<score> benchmark_coordinator::run_specific_benchmarks(
     const std::size_t shard_count = static_cast<std::size_t>(
         std::min(settings_->thread_count, total_iterations));
 
-    report_.set_run_configuration(*settings_, benchmark_names, num_threads);
+    Settings run_settings = *settings_;
+    for (const auto& name : benchmark_names) {
+        if (is_integer_kernel(name) || is_floating_kernel(name)) {
+            run_settings.weights.try_emplace(name, 0.05);
+            run_settings.baseline_times.try_emplace(name, is_integer_kernel(name) ? 0.015 : 0.020);
+        }
+    }
+    report_.set_run_configuration(run_settings, benchmark_names, num_threads);
     scorer scorer;
-    scorer.load_weights(settings_->weights);
-    scorer.load_baseline_times(settings_->baseline_times);
+    scorer.load_weights(run_settings.weights);
+    scorer.load_baseline_times(run_settings.baseline_times);
 
     const int intensity = settings_->intensity_multiplier;
     const int num_runs = settings_->num_runs;
@@ -119,6 +135,16 @@ std::vector<score> benchmark_coordinator::run_specific_benchmarks(
             throw std::invalid_argument("Iterations per shard exceed the supported range");
         }
         iterations_by_shard[shard] = static_cast<int>(effective);
+    }
+    std::vector<int> arithmetic_loops_by_shard(shard_count);
+    std::uint64_t arithmetic_operations = 0;
+    for (std::size_t shard = 0; shard < shard_count; ++shard) {
+        // Eight independent accumulator lanes perform one operation each loop.
+        const int loops = 1 + (iterations_by_shard[shard] - 1) /
+                              static_cast<int>(benchmark::arithmetic_lanes);
+        arithmetic_loops_by_shard[shard] = loops;
+        arithmetic_operations += work_product({static_cast<std::uint64_t>(loops),
+                                                benchmark::arithmetic_lanes});
     }
 
     const double matrix_size_value = static_cast<double>(settings_->matrix_multiply_size) *
@@ -159,6 +185,38 @@ std::vector<score> benchmark_coordinator::run_specific_benchmarks(
             };
             elapsed = scorer.add_score("integer", benchmark::run_benchmark(runner, num_runs),
                                        "loop iterations", total_effective - shard_count);
+        } else if (is_integer_kernel(benchmark_name) || is_floating_kernel(benchmark_name)) {
+            const arithmetic_operation operation = benchmark_name.ends_with("_add")
+                ? arithmetic_operation::add
+                : benchmark_name.ends_with("_multiply")
+                    ? arithmetic_operation::multiply : arithmetic_operation::divide;
+            if (is_integer_kernel(benchmark_name)) {
+                auto workloads = prepare_workloads<benchmark::integer_kernel_workload>(
+                    pool, worker_count, shard_count, [&](std::size_t shard) {
+                        return std::make_unique<benchmark::integer_kernel_workload>(
+                            arithmetic_loops_by_shard[shard], operation);
+                    });
+                auto runner = [&]() {
+                    run_shards(pool, worker_count, shard_count, [&](std::size_t shard) {
+                        workloads[shard]->run();
+                    });
+                };
+                elapsed = scorer.add_score(benchmark_name, benchmark::run_benchmark(runner, num_runs),
+                                           "integer operations", arithmetic_operations);
+            } else {
+                auto workloads = prepare_workloads<benchmark::floating_kernel_workload>(
+                    pool, worker_count, shard_count, [&](std::size_t shard) {
+                        return std::make_unique<benchmark::floating_kernel_workload>(
+                            arithmetic_loops_by_shard[shard], operation);
+                    });
+                auto runner = [&]() {
+                    run_shards(pool, worker_count, shard_count, [&](std::size_t shard) {
+                        workloads[shard]->run();
+                    });
+                };
+                elapsed = scorer.add_score(benchmark_name, benchmark::run_benchmark(runner, num_runs),
+                                           "floating-point operations", arithmetic_operations);
+            }
         } else if (benchmark_name == "matrix_multiply") {
             auto runner = [&]() {
                 run_shards(pool, worker_count, shard_count, [&](std::size_t) {
