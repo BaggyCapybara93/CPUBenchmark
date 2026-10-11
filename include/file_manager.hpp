@@ -38,7 +38,7 @@ class file_manager{
 
         //Profile save/load helpers
         bool write_profile_txt(const benchmark_profile& profile, const std::string& save_folder) const;
-        bool read_profile_txt(const std::string& path, benchmark_profile& profile) const;
+        void read_profile_txt(const std::string& path, benchmark_profile& profile) const;
     public:
         file_manager(std::shared_ptr<Settings> settings) 
             : settings_(std::move(settings)) {};

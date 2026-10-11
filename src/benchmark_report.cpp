@@ -399,92 +399,70 @@ const std::vector<score>& benchmark_report::get_benchmark_scores() const {
 }
 
 double benchmark_report::get_combined_score() const {
-    try{
-        double total = 0.0;
-        int count = 0;
+    double total = 0.0;
+    int count = 0;
 
+    for (const auto& s : benchmark_scores_) {
+        if (s.benchmark_name_ == "Combined") {
+            total += s.score_;
+            ++count;
+        }
+    }
+
+    if (count == 0) {
         for (const auto& s : benchmark_scores_) {
-            if (s.benchmark_name_ == "Combined") {
+            if (s.benchmark_name_ != "Combined" && !s.diagnostic_) {
                 total += s.score_;
                 ++count;
             }
         }
-
-        if (count == 0)
-        {
-            for (const auto& s : benchmark_scores_) {
-                if (s.benchmark_name_ != "Combined" && !s.diagnostic_) {
-                    total += s.score_;
-                    ++count;
-                }
-            }
-        }
-
-        if (count == 0)
-            return 0.0;
-
-        return total / static_cast<double>(count);
-    } catch (const std::exception& e) {
-        std::cerr << "Error calculating combined score: " << e.what() << "\n";
-        return 0.0;
     }
+
+    if (count == 0)
+        return 0.0;
+
+    return total / static_cast<double>(count);
 }
 
 // Add scores (append)
 void benchmark_report::add_score(const std::vector<score>& benchmarks) {
-    try{
-        if (!run_configuration_.is_object()) {
-            run_configuration_ = nlohmann::json::object();
-        }
-        for (const auto& result : benchmarks) {
-            if (result.benchmark_name_ != "Combined" && !result.work_unit_.empty()) {
-                run_configuration_["workloads"][result.benchmark_name_] = {
-                    {"totalWork", result.total_work_}, {"workUnit", result.work_unit_}
-                };
-                if (result.diagnostic_) {
-                    run_configuration_["workloads"][result.benchmark_name_]["workingSetBytes"] =
-                        result.working_set_bytes_;
-                    run_configuration_["workloads"][result.benchmark_name_]["activeWorkers"] =
-                        result.active_workers_;
-                }
+    if (!run_configuration_.is_object()) {
+        run_configuration_ = nlohmann::json::object();
+    }
+    for (const auto& result : benchmarks) {
+        if (result.benchmark_name_ != "Combined" && !result.work_unit_.empty()) {
+            run_configuration_["workloads"][result.benchmark_name_] = {
+                {"totalWork", result.total_work_}, {"workUnit", result.work_unit_}
+            };
+            if (result.diagnostic_) {
+                run_configuration_["workloads"][result.benchmark_name_]["workingSetBytes"] =
+                    result.working_set_bytes_;
+                run_configuration_["workloads"][result.benchmark_name_]["activeWorkers"] =
+                    result.active_workers_;
             }
         }
-        benchmark_scores_.insert(
-            benchmark_scores_.end(),
-            benchmarks.begin(),
-            benchmarks.end()
-        );
-    } catch (const std::exception& e) {
-        std::cerr << "Error adding scores: " << e.what() << "\n";   
     }
+    benchmark_scores_.insert(benchmark_scores_.end(), benchmarks.begin(), benchmarks.end());
 }
 
 // Add scores with statistics
 void benchmark_report::add_scores_with_stats(const std::vector<std::pair<std::string, double>>& benchmark_times) {
-    try {
-        std::vector<score> new_scores;
-        
-        // Group times by benchmark name
-        std::map<std::string, std::vector<double>> times_map;
-        for (const auto& pt : benchmark_times) {
-            times_map[pt.first].push_back(pt.second);
-        }
-        
-        // Add scores
-        for (auto& [name, times] : times_map) {
-            const timing_statistics stats = calculate_timing_statistics(times);
-            const double normalized = 2500.0 * 0.020 / stats.mean; // Simplified normalization
-            new_scores.emplace_back(name, normalized, stats.mean, std::move(times));
-        }
-        
-        benchmark_scores_.insert(
-            benchmark_scores_.end(),
-            new_scores.begin(),
-            new_scores.end()
-        );
-    } catch (const std::exception& e) {
-        std::cerr << "Error adding scores with stats: " << e.what() << "\n";
+    std::vector<score> new_scores;
+
+    // Group times by benchmark name
+    std::map<std::string, std::vector<double>> times_map;
+    for (const auto& pt : benchmark_times) {
+        times_map[pt.first].push_back(pt.second);
     }
+
+    // Add scores
+    for (auto& [name, times] : times_map) {
+        const timing_statistics stats = calculate_timing_statistics(times);
+        const double normalized = 2500.0 * 0.020 / stats.mean; // Simplified normalization
+        new_scores.emplace_back(name, normalized, stats.mean, std::move(times));
+    }
+
+    benchmark_scores_.insert(benchmark_scores_.end(), new_scores.begin(), new_scores.end());
 }
 
 // Compute statistics for all benchmarks

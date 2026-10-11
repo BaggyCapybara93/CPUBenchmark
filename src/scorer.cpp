@@ -1,6 +1,5 @@
 #include "scorer.hpp"
 #include "timing_statistics.hpp"
-#include "iostream"
 #include <algorithm>
 #include <cmath>
 #include <numeric>
@@ -103,34 +102,30 @@ void scorer::add_scores(const std::vector<std::pair<std::string, double>>& bench
 
 // Compute statistics for a benchmark
 void scorer::compute_statistics(const std::string& benchmark_name) {
-    try {
-        std::lock_guard<std::mutex> lock(scores_mutex_);
-        
-        std::vector<double> times;
-        for (const auto& s : scores_) {
-            if (s.benchmark_name_ == benchmark_name) {
-                times.insert(times.end(), s.samples_.begin(), s.samples_.end());
-            }
-        }
+    std::lock_guard<std::mutex> lock(scores_mutex_);
 
-        if (times.empty()) {
-            return;
+    std::vector<double> times;
+    for (const auto& s : scores_) {
+        if (s.benchmark_name_ == benchmark_name) {
+            times.insert(times.end(), s.samples_.begin(), s.samples_.end());
         }
-        const timing_statistics stats = calculate_timing_statistics(std::move(times));
-        
-        // Update the first score entry with statistics
-        const auto score_it = std::find_if(scores_.begin(), scores_.end(),
-            [&benchmark_name](const score& entry) { return entry.benchmark_name_ == benchmark_name; });
-        if (score_it != scores_.end()) {
-            score_it->min_time_ = stats.min;
-            score_it->max_time_ = stats.max;
-            score_it->std_dev_ = stats.std_dev;
-            score_it->median_time_ = stats.median;
-            score_it->p95_ = stats.p95;
-            score_it->p99_ = stats.p99;
-        }
-    } catch (const std::exception& e) {
-        std::cerr << "Error computing statistics: " << e.what() << "\n";
+    }
+
+    if (times.empty()) {
+        return;
+    }
+    const timing_statistics stats = calculate_timing_statistics(std::move(times));
+
+    // Update the first score entry with statistics
+    const auto score_it = std::find_if(scores_.begin(), scores_.end(),
+        [&benchmark_name](const score& entry) { return entry.benchmark_name_ == benchmark_name; });
+    if (score_it != scores_.end()) {
+        score_it->min_time_ = stats.min;
+        score_it->max_time_ = stats.max;
+        score_it->std_dev_ = stats.std_dev;
+        score_it->median_time_ = stats.median;
+        score_it->p95_ = stats.p95;
+        score_it->p99_ = stats.p99;
     }
 }
 
@@ -138,31 +133,27 @@ void scorer::compute_statistics(const std::string& benchmark_name) {
 scorer::benchmark_stats scorer::get_stats(const std::string& benchmark_name) {
     benchmark_stats stats = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0};
     
-    try {
-        std::lock_guard<std::mutex> lock(scores_mutex_);
-        
-        std::vector<double> times;
-        for (const auto& s : scores_) {
-            if (s.benchmark_name_ == benchmark_name) {
-                times.insert(times.end(), s.samples_.begin(), s.samples_.end());
-            }
+    std::lock_guard<std::mutex> lock(scores_mutex_);
+
+    std::vector<double> times;
+    for (const auto& s : scores_) {
+        if (s.benchmark_name_ == benchmark_name) {
+            times.insert(times.end(), s.samples_.begin(), s.samples_.end());
         }
-        
-        if (times.empty()) {
-            return stats;
-        }
-        const timing_statistics calculated = calculate_timing_statistics(std::move(times));
-        stats.min_time = calculated.min;
-        stats.max_time = calculated.max;
-        stats.std_dev = calculated.std_dev;
-        stats.median_time = calculated.median;
-        stats.p95 = calculated.p95;
-        stats.p99 = calculated.p99;
-        stats.count = static_cast<int>(calculated.count);
-    } catch (const std::exception& e) {
-        std::cerr << "Error getting stats: " << e.what() << "\n";
     }
-    
+
+    if (times.empty()) {
+        return stats;
+    }
+    const timing_statistics calculated = calculate_timing_statistics(std::move(times));
+    stats.min_time = calculated.min;
+    stats.max_time = calculated.max;
+    stats.std_dev = calculated.std_dev;
+    stats.median_time = calculated.median;
+    stats.p95 = calculated.p95;
+    stats.p99 = calculated.p99;
+    stats.count = static_cast<int>(calculated.count);
+
     return stats;
 }
 

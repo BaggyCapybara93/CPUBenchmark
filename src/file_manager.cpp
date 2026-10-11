@@ -4,20 +4,23 @@ using json = nlohmann::json;
 namespace fs = std::filesystem;
 
 #include <iomanip>
+#include <stdexcept>
 #include <unordered_map>
 #include <algorithm>
+#include <utility>
 
 
 void file_manager::save_report(const benchmark_report& report, const std::string& save_folder) const{
-    try{
-        if(settings_.get()->save_method == "json"){
-            write_json(report, save_folder);
-        }
-        else if(settings_.get()->save_method == "txt"){
-            write_txt(report, save_folder);
-        }
-    } catch(const std::exception& e){
-        std::cerr << "Failed to save report: " << e.what() << "\n";
+    bool saved = false;
+    if (settings_->save_method == "json") {
+        saved = write_json(report, save_folder);
+    } else if (settings_->save_method == "txt") {
+        saved = write_txt(report, save_folder);
+    } else {
+        throw std::invalid_argument("Unsupported report save method: " + settings_->save_method);
+    }
+    if (!saved) {
+        throw std::runtime_error("Failed to save report in: " + save_folder);
     }
 }
 
@@ -141,6 +144,10 @@ bool file_manager::write_txt(const benchmark_report& report, const std::string& 
         }
 
         file.close();
+        if (!file) {
+            std::cerr << "Failed to write report: " << fullPath << "\n";
+            return false;
+        }
         std::cout << "Benchmark saved to: " << fullPath << "\n";
         
         // Compare with previous runs
@@ -229,6 +236,11 @@ bool file_manager::write_json(const benchmark_report& report, const std::string&
         }
 
         file << j.dump(4); // print with 4-space indent
+        file.close();
+        if (!file) {
+            std::cerr << "Failed to write report: " << file_path << "\n";
+            return false;
+        }
         return true;
 
     }catch(const std::exception& e){
@@ -237,12 +249,11 @@ bool file_manager::write_json(const benchmark_report& report, const std::string&
     }
 }
 
-bool file_manager::read_profile_txt(const std::string& path, benchmark_profile& profile) const{
+void file_manager::read_profile_txt(const std::string& path, benchmark_profile& profile) const{
     try{
         std::ifstream file(path);
         if (!file.is_open()) {
-            std::cerr << "Failed to open profile file: " << path << "\n";
-            return false;
+            throw std::runtime_error("Could not open file");
         }
 
         std::string line;
@@ -277,9 +288,10 @@ bool file_manager::read_profile_txt(const std::string& path, benchmark_profile& 
                             size_t end = trimmed.find_last_not_of(" \t");
                             if (start != std::string::npos) {
                                 trimmed = trimmed.substr(start, end - start + 1);
-                                if (settings_.get()->known_benchmarks.contains(trimmed)) {
-                                    profile.benchmarks.push_back(trimmed);
+                                if (!settings_->known_benchmarks.contains(trimmed)) {
+                                    throw std::invalid_argument("Unknown benchmark in profile: " + trimmed);
                                 }
+                                profile.benchmarks.push_back(trimmed);
                             }
                         }
                     }
@@ -317,10 +329,14 @@ bool file_manager::read_profile_txt(const std::string& path, benchmark_profile& 
             }
         }
 
-        return true;
+        if (!file.eof() && file.fail()) {
+            throw std::runtime_error("Could not read file");
+        }
+        if (profile.benchmarks.empty()) {
+            throw std::invalid_argument("Profile has no benchmarks");
+        }
     }catch(const std::exception& e){
-        std::cerr << "Error reading profile: " << e.what() << "\n";
-        return false;
+        throw std::runtime_error("Failed to read profile '" + path + "': " + e.what());
     }
 }
 
@@ -361,46 +377,45 @@ bool file_manager::write_profile_txt(const benchmark_profile& profile, const std
     file << "cache_sweep_hops=" << profile.cache_sweep_hops << "\n";
 
     file.close();
+    if (!file) {
+        std::cerr << "Failed to write profile: " << fullPath << "\n";
+        return false;
+    }
     std::cout << "Profile saved to: " << fullPath << "\n";
     return true;
 }
 
 void file_manager::read_profile(const std::string& path){
     benchmark_profile temp_profile;
-    if (read_profile_txt(path, temp_profile)) {
-        // Apply profile settings to current settings
-        settings_.get()->profile = temp_profile;
-    }
+    read_profile_txt(path, temp_profile);
+    settings_->profile = std::move(temp_profile);
 }
 
 void file_manager::load_profile(const std::string& profile_path){
     benchmark_profile temp_profile;
-    if (read_profile_txt(profile_path, temp_profile)) {
-        // Apply profile settings to current settings
-        settings_.get()->profile = temp_profile;
-        settings_.get()->iterations = temp_profile.iterations;
-        settings_.get()->repeat_count = temp_profile.repeat_count;
-        settings_.get()->intensity_multiplier = temp_profile.intensity_multiplier;
-        settings_.get()->matrix_multiply_size = temp_profile.matrix_multiply_size;
-        settings_.get()->num_runs = temp_profile.num_runs;
-        settings_.get()->cache_sweep_min_kib = temp_profile.cache_sweep_min_kib;
-        settings_.get()->cache_sweep_max_kib = temp_profile.cache_sweep_max_kib;
-        settings_.get()->cache_sweep_hops = temp_profile.cache_sweep_hops;
-        std::cout << "Profile loaded: " << profile_path << "\n";
-        std::cout << "  Profile Name: " << temp_profile.name << "\n";
-        std::cout << "  Benchmarks: ";
-        for (const auto& b : temp_profile.benchmarks) {
-            std::cout << b << " ";
-        }
-        std::cout << "\n";
-        std::cout << "  Iterations: " << temp_profile.iterations << "\n";
-        std::cout << "  Repeat Count: " << temp_profile.repeat_count << "\n";
-        std::cout << "  Intensity Multiplier: " << temp_profile.intensity_multiplier << "\n";
-        std::cout << "  Matrix Multiply Size: " << temp_profile.matrix_multiply_size << "\n";
-        std::cout << "  Num Runs: " << temp_profile.num_runs << "\n";
-    } else {
-        std::cerr << "Failed to load profile: " << profile_path << "\n";
+    read_profile_txt(profile_path, temp_profile);
+    // Apply profile settings to current settings
+    settings_->profile = temp_profile;
+    settings_->iterations = temp_profile.iterations;
+    settings_->repeat_count = temp_profile.repeat_count;
+    settings_->intensity_multiplier = temp_profile.intensity_multiplier;
+    settings_->matrix_multiply_size = temp_profile.matrix_multiply_size;
+    settings_->num_runs = temp_profile.num_runs;
+    settings_->cache_sweep_min_kib = temp_profile.cache_sweep_min_kib;
+    settings_->cache_sweep_max_kib = temp_profile.cache_sweep_max_kib;
+    settings_->cache_sweep_hops = temp_profile.cache_sweep_hops;
+    std::cout << "Profile loaded: " << profile_path << "\n";
+    std::cout << "  Profile Name: " << temp_profile.name << "\n";
+    std::cout << "  Benchmarks: ";
+    for (const auto& b : temp_profile.benchmarks) {
+        std::cout << b << " ";
     }
+    std::cout << "\n";
+    std::cout << "  Iterations: " << temp_profile.iterations << "\n";
+    std::cout << "  Repeat Count: " << temp_profile.repeat_count << "\n";
+    std::cout << "  Intensity Multiplier: " << temp_profile.intensity_multiplier << "\n";
+    std::cout << "  Matrix Multiply Size: " << temp_profile.matrix_multiply_size << "\n";
+    std::cout << "  Num Runs: " << temp_profile.num_runs << "\n";
 }
 
 bool file_manager::save_profile(const benchmark_profile& profile, const std::string& save_folder) const{

@@ -204,6 +204,79 @@ void test_profile(const std::string& profile_path) {
             "profile execution settings were not applied");
 }
 
+void test_required_io_failures() {
+    auto settings = std::make_shared<Settings>();
+    file_manager manager(settings);
+    const auto directory = std::filesystem::temp_directory_path() /
+        ("cpubenchmark_io_failures_" + std::to_string(
+            std::chrono::steady_clock::now().time_since_epoch().count()));
+    std::filesystem::create_directories(directory);
+
+    bool rejected_missing_profile = false;
+    try {
+        manager.load_profile((directory / "missing.txt").string());
+    } catch (const std::runtime_error&) {
+        rejected_missing_profile = true;
+    }
+    require(rejected_missing_profile && settings->profile.benchmarks.empty(),
+            "a missing profile must fail without changing settings");
+
+    const auto invalid_profile = directory / "invalid.txt";
+    {
+        std::ofstream file(invalid_profile);
+        file << "benchmarks=unknown_benchmark\n";
+    }
+    bool rejected_invalid_profile = false;
+    try {
+        manager.load_profile(invalid_profile.string());
+    } catch (const std::runtime_error&) {
+        rejected_invalid_profile = true;
+    }
+    require(rejected_invalid_profile && settings->profile.benchmarks.empty(),
+            "an invalid profile must fail without changing settings");
+
+    const auto empty_profile = directory / "empty.txt";
+    {
+        std::ofstream file(empty_profile);
+        file << "name=empty\n";
+    }
+    bool rejected_empty_profile = false;
+    try {
+        manager.load_profile(empty_profile.string());
+    } catch (const std::runtime_error&) {
+        rejected_empty_profile = true;
+    }
+    require(rejected_empty_profile && settings->profile.benchmarks.empty(),
+            "an empty profile must not fall back to the default suite");
+
+    const auto blocked_folder = directory / "existing_file";
+    {
+        std::ofstream file(blocked_folder);
+        file << "block report directory creation";
+    }
+    benchmark_report report;
+    report.add_score({score("alpha", 100.0, 1.0)});
+    for (const std::string method : {"txt", "json"}) {
+        settings->save_method = method;
+        bool rejected_failed_save = false;
+        try {
+            manager.save_report(report, blocked_folder.string());
+        } catch (const std::runtime_error&) {
+            rejected_failed_save = true;
+        }
+        require(rejected_failed_save, "a failed report save must reach its caller");
+    }
+    settings->save_method = "unsupported";
+    bool rejected_save_method = false;
+    try {
+        manager.save_report(report, directory.string());
+    } catch (const std::invalid_argument&) {
+        rejected_save_method = true;
+    }
+    require(rejected_save_method, "an unsupported save method must fail");
+    std::filesystem::remove_all(directory);
+}
+
 void test_report_combined_score() {
     benchmark_report report;
     report.set_active_thread_count(4);
@@ -496,6 +569,7 @@ int main(int argc, char* argv[]) {
         test_arithmetic_kernels();
         test_branch_patterns();
         test_profile(argv[1]);
+        test_required_io_failures();
         test_report_combined_score();
         test_report_serialization();
         test_comparison_requires_matching_configuration();

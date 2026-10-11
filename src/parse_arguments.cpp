@@ -73,6 +73,10 @@ void parse_arguments::parse(int argc, char* argv[]) {
             return;
         }
 
+        if (settings_->save_method != "json" && settings_->save_method != "txt") {
+            throw std::invalid_argument("saveMethod must be json or txt");
+        }
+
         if (vm.count("profile")) {
             std::string profile_path = vm["profile"].as<std::string>();
             file_manager fm(settings_);
@@ -130,7 +134,6 @@ void parse_arguments::parse(int argc, char* argv[]) {
             settings_.get()->mode = mode::both; // default
 
     } catch(const std::exception& e){
-        std::cerr << "Argument parsing error: " << e.what() << "\n";
-        settings_->mode = mode::invalid;
+        throw std::runtime_error("Argument parsing error: " + std::string(e.what()));
     }
 }

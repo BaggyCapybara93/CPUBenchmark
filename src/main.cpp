@@ -3,6 +3,7 @@
 #include "benchmark_report.hpp"
 #include "benchmark_coordinator.hpp"
 #include "file_manager.hpp"
+#include <exception>
 #include <filesystem>
 #include <iostream>
 #include <memory>
@@ -28,7 +29,7 @@ std::filesystem::path get_output_root(char* argv[]) {
         : std::filesystem::current_path();
 }
 
-int main(int argc, char* argv[]) {
+static int run_cli(int argc, char* argv[]) {
     std::shared_ptr<Settings> settings = std::make_shared<Settings>();
 
     parse_arguments args(argc, argv, settings);
@@ -166,7 +167,7 @@ int main(int argc, char* argv[]) {
         }
 
         case mode::none:{
-            return 1;
+            return 0;
         }
 
         case mode::invalid:
@@ -174,5 +175,14 @@ int main(int argc, char* argv[]) {
             std::cout << "Invalid benchmarking mode. Exiting...\n";
             return 1;
         }
+    }
+}
+
+int main(int argc, char* argv[]) {
+    try {
+        return run_cli(argc, argv);
+    } catch (const std::exception& error) {
+        std::cerr << "Benchmark failed: " << error.what() << "\n";
+        return 1;
     }
 }
