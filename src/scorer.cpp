@@ -64,6 +64,37 @@ double scorer::add_score(const std::string& benchmark_name, std::vector<double> 
     return stats.mean;
 }
 
+double scorer::add_cache_sweep_point(const std::string& benchmark_name,
+                                     std::vector<double> run_times,
+                                     std::uint64_t total_hops,
+                                     std::uint64_t working_set_bytes,
+                                     std::uint64_t active_workers) {
+    if (run_times.empty() || total_hops == 0 || working_set_bytes == 0 || active_workers == 0) {
+        throw std::invalid_argument("Invalid cache sweep measurement");
+    }
+    for (double duration : run_times) {
+        if (!std::isfinite(duration) || duration <= 0.0) {
+            throw std::invalid_argument("Measured run times must be finite and positive");
+        }
+    }
+    const timing_statistics stats = calculate_timing_statistics(run_times);
+    std::lock_guard<std::mutex> lock(scores_mutex_);
+    scores_.emplace_back(benchmark_name, 0.0, stats.mean, std::move(run_times));
+    score& result = scores_.back();
+    result.diagnostic_ = true;
+    result.work_unit_ = "pointer hops";
+    result.total_work_ = total_hops;
+    result.working_set_bytes_ = working_set_bytes;
+    result.active_workers_ = active_workers;
+    result.min_time_ = stats.min;
+    result.max_time_ = stats.max;
+    result.std_dev_ = stats.std_dev;
+    result.median_time_ = stats.median;
+    result.p95_ = stats.p95;
+    result.p99_ = stats.p99;
+    return stats.mean;
+}
+
 void scorer::add_scores(const std::vector<std::pair<std::string, double>>& benchmark_times) {
     for (const auto& [name, elapsed_time] : benchmark_times) {
         add_score(name, elapsed_time);
@@ -182,6 +213,7 @@ double scorer::compute_final_score() {
 
     std::unordered_map<std::string, std::pair<double, std::size_t>> times;
     for (const auto& entry : scores_) {
+        if (entry.diagnostic_) continue;
         times[entry.benchmark_name_].first += entry.time_;
         ++times[entry.benchmark_name_].second;
     }

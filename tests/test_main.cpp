@@ -343,6 +343,96 @@ void test_same_work_in_both_modes() {
     }
 }
 
+void test_cache_size_sweep() {
+    const auto directory = std::filesystem::temp_directory_path() /
+        ("cpubenchmark_cache_sweep_" + std::to_string(
+            std::chrono::steady_clock::now().time_since_epoch().count()));
+    std::filesystem::create_directories(directory);
+    const auto profile_path = directory / "cache_profile.txt";
+    {
+        std::ofstream profile(profile_path);
+        profile << "name=cache_test\nbenchmarks=cache_size_sweep\n"
+                   "iterations=3\nintensity_multiplier=1\nnum_runs=2\n"
+                   "cache_sweep_min_kib=4\ncache_sweep_max_kib=16\n"
+                   "cache_sweep_hops=4096\n";
+    }
+    auto settings = std::make_shared<Settings>();
+    settings->thread_count = 3;
+    file_manager manager(settings);
+    manager.load_profile(profile_path.string());
+    require(settings->profile.benchmarks == std::vector<std::string>{"cache_size_sweep"} &&
+                settings->cache_sweep_min_kib == 4 && settings->cache_sweep_max_kib == 16 &&
+                settings->cache_sweep_hops == 4096,
+            "cache sweep profile options must load");
+
+    for (const auto [run_mode, workers] : {
+             std::pair{mode::single_threaded, 1U},
+             std::pair{mode::multi_threaded, 3U}}) {
+        benchmark_report report;
+        benchmark_coordinator coordinator(report, settings);
+        coordinator.start_with_profile(settings->profile.benchmarks, run_mode);
+        const auto& results = report.get_benchmark_scores();
+        require(results.size() == 4 && report.get_combined_score() == 0.0,
+                "cache sweep must produce three diagnostic points without affecting scoring");
+        for (std::size_t i = 0; i < 3; ++i) {
+            const auto& point = results[i];
+            const std::uint64_t size_bytes = 4096ULL << i;
+            require(point.benchmark_name_ == "cache_sweep_" + std::to_string(4U << i) + "KiB" &&
+                        point.diagnostic_ && point.working_set_bytes_ == size_bytes &&
+                        point.active_workers_ == workers && point.total_work_ == workers * 4096 &&
+                        point.samples_.size() == 2 && point.nanoseconds_per_hop() &&
+                        *point.nanoseconds_per_hop() > 0.0 &&
+                        approximately_equal(*point.nanoseconds_per_hop(),
+                            point.time_ * 1e9 * static_cast<double>(workers) /
+                                static_cast<double>(point.total_work_)),
+                    "each cache sweep point must record its size, work, samples, and effective latency");
+        }
+        require(report.get_run_configuration().at("cacheSweepMaxKiB") == 16 &&
+                    report.get_run_configuration().at("cacheSweepHops") == 4096,
+                "run configuration must identify the sweep range and hop count");
+        settings->save_method = "json";
+        const auto folder = directory / std::to_string(workers);
+        manager.save_report(report, folder.string());
+        const auto path = std::filesystem::directory_iterator(folder)->path();
+        std::ifstream input(path);
+        const auto data = nlohmann::json::parse(input);
+        require(data.at("combinedScore").is_null() && data.at("scores").size() == 3 &&
+                    data.at("scores").at(2).at("workingSetBytes") == 16384 &&
+                    data.at("scores").at(2).at("score").is_null() &&
+                    data.at("scores").at(2).at("effectiveNsPerHop").get<double>() > 0.0,
+                "JSON reports must expose sweep sizes and effective latency as diagnostics");
+        settings->save_method = "txt";
+        const auto text_folder = directory / (std::to_string(workers) + "_text");
+        manager.save_report(report, text_folder.string());
+        std::ifstream text_input(std::filesystem::directory_iterator(text_folder)->path());
+        std::ostringstream report_text;
+        report_text << text_input.rdbuf();
+        require(report_text.str().find("Working Set: 16384 bytes per worker") !=
+                    std::string::npos &&
+                    report_text.str().find("Effective Latency:") != std::string::npos &&
+                    report_text.str().find("Score: N/A (diagnostic profile)") != std::string::npos,
+                "text reports must display sweep working sets and effective latency");
+    }
+    settings->cache_sweep_min_kib = 3;
+    bool rejected_invalid_size = false;
+    try {
+        benchmark_report invalid_report;
+        benchmark_coordinator invalid_runner(invalid_report, settings);
+        invalid_runner.start_with_profile(settings->profile.benchmarks, mode::single_threaded);
+    } catch (const std::invalid_argument&) {
+        rejected_invalid_size = true;
+    }
+    require(rejected_invalid_size, "cache sweeps must reject unsupported working-set sizes");
+    scorer mixed;
+    mixed.load_weights({{"alpha", 1.0}});
+    mixed.load_baseline_times({{"alpha", 2.0}});
+    mixed.add_score("alpha", 2.0);
+    mixed.add_cache_sweep_point("cache_sweep_4KiB", {0.01, 0.02}, 4096, 4096, 1);
+    require(approximately_equal(mixed.compute_final_score(), 2500.0),
+            "cache sweep diagnostics must not change a scored benchmark's combined result");
+    std::filesystem::remove_all(directory);
+}
+
 }  // namespace
 
 int main(int argc, char* argv[]) {
@@ -356,6 +446,7 @@ int main(int argc, char* argv[]) {
         test_report_serialization();
         test_comparison_requires_matching_configuration();
         test_same_work_in_both_modes();
+        test_cache_size_sweep();
         return EXIT_SUCCESS;
     } catch (const std::exception& error) {
         std::cerr << "Test failure: " << error.what() << '\n';

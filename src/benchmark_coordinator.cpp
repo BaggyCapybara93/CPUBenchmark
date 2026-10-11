@@ -6,6 +6,7 @@
 #include <stdexcept>
 #include <initializer_list>
 #include <string>
+#include <bit>
 
 //Threading
 void benchmark_thread_pool::run_all(const std::function<void()>& fn) {
@@ -105,6 +106,18 @@ std::vector<score> benchmark_coordinator::run_specific_benchmarks(
     if (num_threads <= 0 || settings_->thread_count <= 0 || total_iterations <= 0 ||
         settings_->intensity_multiplier <= 0) {
         throw std::invalid_argument("Benchmark needs positive thread, iteration, and intensity counts");
+    }
+    if (std::find(benchmark_names.begin(), benchmark_names.end(), "cache_size_sweep") !=
+        benchmark_names.end()) {
+        const int min_kib = settings_->cache_sweep_min_kib;
+        const int max_kib = settings_->cache_sweep_max_kib;
+        if (min_kib < 4 || max_kib < min_kib || max_kib > 65536 ||
+            !std::has_single_bit(static_cast<unsigned int>(min_kib)) ||
+            !std::has_single_bit(static_cast<unsigned int>(max_kib)) ||
+            settings_->cache_sweep_hops <= 0) {
+            throw std::invalid_argument(
+                "Cache sweep needs power-of-two sizes from 4 to 65536 KiB and positive hops");
+        }
     }
     const std::size_t worker_count = static_cast<std::size_t>(num_threads);
     const std::size_t shard_count = static_cast<std::size_t>(
@@ -314,6 +327,34 @@ std::vector<score> benchmark_coordinator::run_specific_benchmarks(
             };
             elapsed = scorer.add_score("cache_latency", benchmark::run_benchmark(runner, num_runs),
                                        "pointer hops", work_product({total_effective, 16}));
+        } else if (benchmark_name == "cache_size_sweep") {
+            const auto hops = static_cast<std::size_t>(settings_->cache_sweep_hops);
+            const auto active_workers = std::min(worker_count, shard_count);
+            const auto total_hops = work_product({active_workers, hops});
+            for (std::uint64_t size_kib =
+                     static_cast<std::uint64_t>(settings_->cache_sweep_min_kib);
+                 size_kib <= static_cast<std::uint64_t>(settings_->cache_sweep_max_kib);
+                 size_kib *= 2) {
+                const std::size_t size_bytes = static_cast<std::size_t>(size_kib * 1024);
+                auto workloads = prepare_workloads<benchmark::cache_sweep_workload>(
+                    pool, worker_count, active_workers, [&](std::size_t) {
+                        return std::make_unique<benchmark::cache_sweep_workload>(size_bytes);
+                    });
+                auto runner = [&]() {
+                    run_shards(pool, worker_count, active_workers, [&](std::size_t shard) {
+                        workloads[shard]->run(hops);
+                    });
+                };
+                const std::string point_name = "cache_sweep_" + std::to_string(size_kib) + "KiB";
+                elapsed = scorer.add_cache_sweep_point(
+                    point_name, benchmark::run_benchmark(runner, num_runs),
+                    total_hops, workloads.front()->working_set_bytes(), active_workers);
+                total_time += elapsed;
+                const auto latency = scorer.get_scores().back().nanoseconds_per_hop();
+                std::cout << point_name << ": " << *latency
+                          << " ns/hop/active worker (" << elapsed << " s)\n";
+            }
+            continue;
         } else {
             std::cerr << "Unknown benchmark: " << benchmark_name << "\n";
             continue;

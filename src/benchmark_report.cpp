@@ -385,6 +385,12 @@ void benchmark_report::set_run_configuration(
             {"cppStandard", 20}
         }}
     };
+    if (std::find(benchmark_names.begin(), benchmark_names.end(), "cache_size_sweep") !=
+        benchmark_names.end()) {
+        run_configuration_["cacheSweepMinKiB"] = settings.cache_sweep_min_kib;
+        run_configuration_["cacheSweepMaxKiB"] = settings.cache_sweep_max_kib;
+        run_configuration_["cacheSweepHops"] = settings.cache_sweep_hops;
+    }
 }
 
 // Getters
@@ -407,7 +413,7 @@ double benchmark_report::get_combined_score() const {
         if (count == 0)
         {
             for (const auto& s : benchmark_scores_) {
-                if (s.benchmark_name_ != "Combined") {
+                if (s.benchmark_name_ != "Combined" && !s.diagnostic_) {
                     total += s.score_;
                     ++count;
                 }
@@ -435,6 +441,12 @@ void benchmark_report::add_score(const std::vector<score>& benchmarks) {
                 run_configuration_["workloads"][result.benchmark_name_] = {
                     {"totalWork", result.total_work_}, {"workUnit", result.work_unit_}
                 };
+                if (result.diagnostic_) {
+                    run_configuration_["workloads"][result.benchmark_name_]["workingSetBytes"] =
+                        result.working_set_bytes_;
+                    run_configuration_["workloads"][result.benchmark_name_]["activeWorkers"] =
+                        result.active_workers_;
+                }
             }
         }
         benchmark_scores_.insert(
@@ -575,12 +587,13 @@ bool benchmark_report::compare_with_previous(const std::string& save_folder, con
     std::map<std::string, std::vector<double>> current_scores;
     std::unordered_set<std::string> benchmark_names;
     for (const auto& result : benchmark_scores_) {
-        if (result.benchmark_name_ != "Combined") {
+        if (result.benchmark_name_ != "Combined" && !result.diagnostic_) {
             benchmark_names.insert(result.benchmark_name_);
             current_times[result.benchmark_name_].push_back(result.time_);
             current_scores[result.benchmark_name_].push_back(result.score_);
         }
     }
+    if (benchmark_names.empty()) return false;
 
     const auto parse_file = [&](const std::string& path, saved_run& run) {
         std::ifstream input(path);
@@ -602,6 +615,8 @@ bool benchmark_report::compare_with_previous(const std::string& save_folder, con
                 } else if (line.starts_with("Run Configuration: ")) {
                     run.configuration = line.substr(std::string("Run Configuration: ").size());
                 } else if (line == "COMBINED SCORE") {
+                    current_benchmark.clear();
+                } else if (line == "Score: N/A (diagnostic)") {
                     current_benchmark.clear();
                 } else if (benchmark_names.contains(line)) {
                     current_benchmark = line;

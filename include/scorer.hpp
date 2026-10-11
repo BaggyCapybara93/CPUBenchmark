@@ -26,6 +26,18 @@ struct score {
     std::string work_unit_;
     std::uint64_t total_work_ = 0;
     std::uint64_t estimated_bytes_per_work_ = 0;
+    bool diagnostic_ = false;
+    std::uint64_t working_set_bytes_ = 0;
+    std::uint64_t active_workers_ = 0;
+
+    std::optional<double> nanoseconds_per_hop() const {
+        if (!diagnostic_ || active_workers_ == 0 || total_work_ == 0 || time_ <= 0.0) {
+            return std::nullopt;
+        }
+        const double latency = time_ * 1e9 * static_cast<double>(active_workers_) /
+                               static_cast<double>(total_work_);
+        return std::isfinite(latency) ? std::optional<double>(latency) : std::nullopt;
+    }
 
     std::optional<double> work_per_second() const {
         if (total_work_ == 0 || work_unit_.empty() || !std::isfinite(time_) || time_ <= 0.0) {
@@ -111,6 +123,11 @@ public:
     double add_score(const std::string& benchmark_name, std::vector<double> run_times,
                      std::string work_unit = {}, std::uint64_t total_work = 0,
                      std::uint64_t estimated_bytes_per_work = 0);
+    double add_cache_sweep_point(const std::string& benchmark_name,
+                                 std::vector<double> run_times,
+                                 std::uint64_t total_hops,
+                                 std::uint64_t working_set_bytes,
+                                 std::uint64_t active_workers);
 
     // Clear all stored scores
     void clear_scores();

@@ -5,6 +5,7 @@ namespace fs = std::filesystem;
 
 #include <iomanip>
 #include <unordered_map>
+#include <algorithm>
 
 
 void file_manager::save_report(const benchmark_report& report, const std::string& save_folder) const{
@@ -88,12 +89,22 @@ bool file_manager::write_txt(const benchmark_report& report, const std::string& 
                 file << "Suite Repetition: " << repetition << " of "
                      << repetition_counts.at(s.benchmark_name_) << "\n";
             }
-            file << "Score: " << std::fixed << std::setprecision(2) << s.score_ << "\n";
+            if (s.diagnostic_) {
+                file << "Score: N/A (diagnostic)\n";
+                file << "Working Set: " << s.working_set_bytes_ << " bytes per worker\n";
+                file << "Active Workers: " << s.active_workers_ << "\n";
+            } else {
+                file << "Score: " << std::fixed << std::setprecision(2) << s.score_ << "\n";
+            }
             file << "Work: " << s.total_work_ << " " << s.work_unit_ << "\n";
             file << "Time (mean): " << std::fixed << std::setprecision(9) << s.time_ << "s\n";
             if (const auto rate = s.work_per_second()) {
                 file << "Throughput: " << std::fixed << std::setprecision(2) << *rate
                      << " " << s.work_unit_ << "/s\n";
+            }
+            if (const auto latency = s.nanoseconds_per_hop()) {
+                file << "Effective Latency: " << std::fixed << std::setprecision(3)
+                     << *latency << " ns/hop/active worker\n";
             }
             if (const auto bandwidth = s.estimated_gb_per_second()) {
                 file << "Estimated Logical Throughput: " << std::fixed << std::setprecision(3)
@@ -115,15 +126,28 @@ bool file_manager::write_txt(const benchmark_report& report, const std::string& 
         file << "==========================================\n";
         file << "COMBINED SCORE\n";
         file << "==========================================\n";
-        file << "Score: " << std::fixed << std::setprecision(2) << report.get_combined_score() << "\n";
-        file << "Note: Combined score is a weighted aggregate of individual benchmarks\n";
+        const auto& results = report.get_benchmark_scores();
+        const bool has_scored_results = std::any_of(results.begin(), results.end(),
+            [](const score& result) { return result.benchmark_name_ != "Combined" && !result.diagnostic_; });
+        const bool has_diagnostics = std::any_of(results.begin(), results.end(),
+            [](const score& result) { return result.diagnostic_; });
+        if (has_scored_results) {
+            file << "Score: " << std::fixed << std::setprecision(2) << report.get_combined_score() << "\n";
+            file << (has_diagnostics
+                ? "Note: Combined score excludes diagnostic cache sweep points\n"
+                : "Note: Combined score is a weighted aggregate of individual benchmarks\n");
+        } else {
+            file << "Score: N/A (diagnostic profile)\n";
+        }
 
         file.close();
         std::cout << "Benchmark saved to: " << fullPath << "\n";
         
         // Compare with previous runs
         const std::string mode_str = std::filesystem::path(save_folder).filename().string();
-        report.compare_with_previous(save_folder, mode_str, fullPath.string());
+        if (has_scored_results) {
+            report.compare_with_previous(save_folder, mode_str, fullPath.string());
+        }
         
         return true;
     } catch (const std::exception& e) {
@@ -143,7 +167,10 @@ bool file_manager::write_json(const benchmark_report& report, const std::string&
         json j;
 
         j["saveFolder"] = save_folder;
-        j["combinedScore"] = report.get_combined_score();
+        const auto& results = report.get_benchmark_scores();
+        const bool has_scored_results = std::any_of(results.begin(), results.end(),
+            [](const score& result) { return result.benchmark_name_ != "Combined" && !result.diagnostic_; });
+        j["combinedScore"] = has_scored_results ? json(report.get_combined_score()) : json(nullptr);
         j["measurementVersion"] = benchmark_report::measurement_version;
         j["runConfiguration"] = report.get_run_configuration();
         j["cpuName"] = report.get_cpu_name();
@@ -171,7 +198,12 @@ bool file_manager::write_json(const benchmark_report& report, const std::string&
             j["scores"].push_back({
                 {"benchmarkName", s.benchmark_name_},
                 {"suiteRepetition", repetition},
-                {"score", s.score_},
+                {"score", s.diagnostic_ ? json(nullptr) : json(s.score_)},
+                {"diagnostic", s.diagnostic_},
+                {"workingSetBytes", s.diagnostic_ ? json(s.working_set_bytes_) : json(nullptr)},
+                {"activeWorkers", s.diagnostic_ ? json(s.active_workers_) : json(nullptr)},
+                {"effectiveNsPerHop", s.nanoseconds_per_hop()
+                    ? json(*s.nanoseconds_per_hop()) : json(nullptr)},
                 {"totalWork", s.total_work_},
                 {"workUnit", s.work_unit_},
                 {"workPerSecond", work_rate ? json(*work_rate) : json(nullptr)},
@@ -271,6 +303,12 @@ bool file_manager::read_profile_txt(const std::string& path, benchmark_profile& 
                     if (!value.empty()) {
                         profile.num_runs = std::stoi(value);
                     }
+                } else if (key == "cache_sweep_min_kib") {
+                    if (!value.empty()) profile.cache_sweep_min_kib = std::stoi(value);
+                } else if (key == "cache_sweep_max_kib") {
+                    if (!value.empty()) profile.cache_sweep_max_kib = std::stoi(value);
+                } else if (key == "cache_sweep_hops") {
+                    if (!value.empty()) profile.cache_sweep_hops = std::stoi(value);
                 } else if (key == "name") {
                     if (!value.empty()) {
                         profile.name = value;
@@ -318,6 +356,9 @@ bool file_manager::write_profile_txt(const benchmark_profile& profile, const std
     file << "intensity_multiplier=" << profile.intensity_multiplier << "\n";
     file << "matrix_multiply_size=" << profile.matrix_multiply_size << "\n";
     file << "num_runs=" << profile.num_runs << "\n";
+    file << "cache_sweep_min_kib=" << profile.cache_sweep_min_kib << "\n";
+    file << "cache_sweep_max_kib=" << profile.cache_sweep_max_kib << "\n";
+    file << "cache_sweep_hops=" << profile.cache_sweep_hops << "\n";
 
     file.close();
     std::cout << "Profile saved to: " << fullPath << "\n";
@@ -342,6 +383,9 @@ void file_manager::load_profile(const std::string& profile_path){
         settings_.get()->intensity_multiplier = temp_profile.intensity_multiplier;
         settings_.get()->matrix_multiply_size = temp_profile.matrix_multiply_size;
         settings_.get()->num_runs = temp_profile.num_runs;
+        settings_.get()->cache_sweep_min_kib = temp_profile.cache_sweep_min_kib;
+        settings_.get()->cache_sweep_max_kib = temp_profile.cache_sweep_max_kib;
+        settings_.get()->cache_sweep_hops = temp_profile.cache_sweep_hops;
         std::cout << "Profile loaded: " << profile_path << "\n";
         std::cout << "  Profile Name: " << temp_profile.name << "\n";
         std::cout << "  Benchmarks: ";

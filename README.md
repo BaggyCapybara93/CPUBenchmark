@@ -16,6 +16,7 @@ A simple C++ CPU benchmark tool for measuring system performance.
 - Throughput in recorded work units per second, plus estimated logical GB/s for memory bandwidth
 - RAM capacity, type, and speed in text and JSON reports when available from the OS
 - Optional integer and floating-point add, multiply, and divide kernels
+- Optional cache-size sweep with working-set size and effective pointer-hop latency in reports
 
 ## Building
 ```bash
@@ -79,6 +80,9 @@ num_runs=3
 | `intensity_multiplier` | Intensity multiplier | 50 |
 | `matrix_multiply_size` | Matrix size | 128 |
 | `num_runs` | Number of runs | 5 |
+| `cache_sweep_min_kib` | Smallest cache sweep working set (power of two, KiB) | 4 |
+| `cache_sweep_max_kib` | Largest cache sweep working set (power of two, KiB; up to 65536) | 32768 |
+| `cache_sweep_hops` | Pointer hops per active worker at each size | 262144 |
 
 **Available Benchmarks:**
 - `floating_point` - Floating-point operations
@@ -90,10 +94,29 @@ num_runs=3
 - `memory_bandwidth` - Memory bandwidth
 - `pointer_chase` - Pointer chasing
 - `cache_latency` - Cache latency
+- `cache_size_sweep` - Random cache-line pointer chasing from 4 KiB through 32 MiB by default
 - `integer_add`, `integer_multiply`, `integer_divide` - Basic unsigned 32-bit integer kernels
 - `floating_add`, `floating_multiply`, `floating_divide` - Basic double-precision kernels
 
 The six arithmetic kernels are available in profiles and are not part of the default full suite, so existing default scores retain their benchmark mix. Each uses eight independent accumulator lanes and cache-resident, deterministic operands. The integer divide kernel varies its dividend from the accumulator to keep the division in each loop iteration; its reported work count includes divisions, while the accumulator update is overhead. Floating-point factors are paired with reciprocals so long multiply and divide runs remain finite. Work counts are rounded up to whole groups of eight operations per shard. Results include loop, input-load, and thread-dispatch overhead, and Release builds may auto-vectorize them. Use them for relative comparisons with the same build and profile rather than as isolated instruction latency measurements.
+
+The cache-size sweep is also profile-only. It allocates one randomized, dependent pointer cycle per active worker, with one 64-byte node per cache line, before timing. Each size uses the same hop count and receives five warmups plus `num_runs` measured samples. Reports list the working set **per worker** and effective nanoseconds per hop per active worker; the latter includes thread dispatch and scheduling overhead. In multi-threaded mode, other workers can contend for shared caches and memory. The sweep is diagnostic and does not enter the combined score; a sweep-only report has no combined score. Cache-level boundaries are inferred from changes in the latency curve, not detected directly.
+
+For example:
+
+```text
+name=cache_sweep
+benchmarks=cache_size_sweep
+iterations=3
+repeat_count=1
+intensity_multiplier=1
+num_runs=5
+cache_sweep_min_kib=4
+cache_sweep_max_kib=32768
+cache_sweep_hops=262144
+```
+
+The sweep allocates up to `cache_sweep_max_kib` per active worker at once. `iterations` must be at least the desired multi-threaded worker count; `--threads` controls the maximum worker count.
 
 For example, a profile can select only these kernels:
 

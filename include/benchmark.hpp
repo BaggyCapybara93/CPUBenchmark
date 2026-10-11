@@ -68,6 +68,19 @@ public:
         std::vector<std::size_t> next_;
     };
 
+    // One randomly ordered cache line per node; construction is outside timing.
+    struct cache_sweep_workload {
+        explicit cache_sweep_workload(std::size_t working_set_bytes);
+        void run(std::size_t hops) const;
+        std::size_t working_set_bytes() const { return nodes_.size() * sizeof(node); }
+
+    private:
+        struct alignas(64) node {
+            std::uint32_t next = 0;
+        };
+        std::vector<node> nodes_;
+    };
+
     static void integer_arithmetic_benchmark(int iterations);
     static void floating_point_benchmark(int iterations);
     static void matrix_multiply_benchmark(int iterations);

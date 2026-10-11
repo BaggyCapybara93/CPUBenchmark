@@ -7,6 +7,7 @@
 #include <iostream>
 #include <numeric>
 #include <thread>
+#include <limits>
 
 namespace {
 
@@ -321,6 +322,31 @@ void benchmark::pointer_chase_workload::run() const {
 void benchmark::pointer_chase_benchmark(size_t size) {
     pointer_chase_workload workload(size);
     workload.run();
+}
+
+benchmark::cache_sweep_workload::cache_sweep_workload(std::size_t working_set_bytes)
+    : nodes_(working_set_bytes / sizeof(node)) {
+    if (working_set_bytes < 2 * sizeof(node) ||
+        working_set_bytes % sizeof(node) != 0 ||
+        nodes_.size() > std::numeric_limits<std::uint32_t>::max()) {
+        throw std::invalid_argument("Cache sweep size must contain whole cache lines");
+    }
+    std::vector<std::uint32_t> order(nodes_.size());
+    std::iota(order.begin(), order.end(), 0U);
+    std::mt19937 rng(2026);
+    std::shuffle(order.begin(), order.end(), rng);
+    for (std::size_t i = 0; i < order.size(); ++i) {
+        nodes_[order[i]].next = order[(i + 1) % order.size()];
+    }
+}
+
+void benchmark::cache_sweep_workload::run(std::size_t hops) const {
+    std::uint32_t index = 0;
+    for (std::size_t i = 0; i < hops; ++i) {
+        index = nodes_[index].next;
+    }
+    escape(index);
+    clobber();
 }
 
 void benchmark::cache_latency_benchmark(size_t size, size_t stride) {
