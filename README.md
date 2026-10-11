@@ -13,6 +13,7 @@ A simple C++ CPU benchmark tool for measuring system performance.
   - Sorting algorithms
 - Configurable parameters (threads, iterations, intensity)
 - Score calculation and reporting (relative performance metrics)
+- RAM capacity, type, and speed in text and JSON reports when available from the OS
 
 ## Building
 ```bash
@@ -28,6 +29,8 @@ Sorting, memory bandwidth, and pointer chasing prepare their inputs before timin
 `numRuns` controls the number of timed samples per benchmark and suite repetition. Reports show their mean, median, min, max, standard deviation, P95, and P99; JSON reports also include every raw run time. Warmup runs are excluded from these statistics.
 
 Single-threaded and multi-threaded modes process the same logical work shards, based on `--threads`. Reports record each benchmark's total work per measured sample and the full run configuration. A saved text run is compared with the newest earlier run only when the workload, active thread count, profile, scoring settings, build settings, and hardware match. Results from different configurations remain available in their reports without a percentage comparison.
+
+RAM type and speed are reported as `Unavailable` if the operating system does not expose them. Linux reads SMBIOS memory data through `dmidecode`, which may require elevated access. Text reports saved before these fields were added are not considered comparable with new runs.
 
 ### Basic Usage
 ```bash

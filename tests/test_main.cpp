@@ -12,6 +12,7 @@
 #include <fstream>
 #include <iostream>
 #include <memory>
+#include <sstream>
 #include <stdexcept>
 #include <string>
 #include <unordered_map>
@@ -122,8 +123,44 @@ void test_report_combined_score() {
     require(approximately_equal(report.get_combined_score(), 321.0),
             "reports must preserve the scorer's combined score");
     require(!report.get_os_info().empty() && !report.get_compiler_info().empty() &&
+                !report.get_ram_type().empty() && !report.get_ram_speed().empty() &&
                 report.get_active_thread_count() == 4,
             "reports must expose system metadata");
+}
+
+void test_memory_metadata_serialization() {
+    auto settings = std::make_shared<Settings>();
+    file_manager manager(settings);
+    benchmark_report report;
+    report.set_run_configuration(*settings, {}, 1);
+    const auto directory = std::filesystem::temp_directory_path() /
+        ("cpubenchmark_memory_" + std::to_string(
+            std::chrono::steady_clock::now().time_since_epoch().count()));
+
+    for (const std::string method : {"txt", "json"}) {
+        settings->save_method = method;
+        const auto folder = directory / method;
+        manager.save_report(report, folder.string());
+        require(std::filesystem::exists(folder) &&
+                    std::filesystem::directory_iterator(folder) != std::filesystem::directory_iterator(),
+                "report file was not written");
+        const auto path = std::filesystem::directory_iterator(folder)->path();
+        std::ifstream input(path);
+        require(input.good(), "could not read saved report");
+        if (method == "json") {
+            const auto data = nlohmann::json::parse(input);
+            require(data.at("ramType") == report.get_ram_type() &&
+                        data.at("ramSpeed") == report.get_ram_speed(),
+                    "JSON report must include RAM type and speed");
+        } else {
+            std::ostringstream text;
+            text << input.rdbuf();
+            require(text.str().find("RAM Type: " + report.get_ram_type()) != std::string::npos &&
+                        text.str().find("RAM Speed: " + report.get_ram_speed()) != std::string::npos,
+                    "text report must include RAM type and speed");
+        }
+    }
+    std::filesystem::remove_all(directory);
 }
 
 void test_comparison_requires_matching_configuration() {
@@ -146,6 +183,8 @@ void test_comparison_requires_matching_configuration() {
         require(output.good(), "could not create comparison fixture");
         output << "CPU: " << report.get_cpu_name() << '\n';
         output << "RAM: " << report.get_ram_info() << '\n';
+        output << "RAM Type: " << report.get_ram_type() << '\n';
+        output << "RAM Speed: " << report.get_ram_speed() << '\n';
         output << "Run Configuration: " << config.dump() << '\n';
         output << "alpha\nScore: 100.0\n";
         if (include_time) {
@@ -159,6 +198,14 @@ void test_comparison_requires_matching_configuration() {
     write_run(newer, mismatched);
     require(report.compare_with_previous(directory.string(), "single_threaded", "current.txt"),
             "comparison should find the newest compatible run, skipping incompatible runs");
+
+    write_run(older, report.get_run_configuration());
+    {
+        std::ofstream output(older, std::ios::app);
+        output << "RAM Speed: different\n";
+    }
+    require(!report.compare_with_previous(directory.string(), "single_threaded", "current.txt"),
+            "comparison must reject runs with a different RAM speed");
 
     write_run(older, report.get_run_configuration(), false);
     require(!report.compare_with_previous(directory.string(), "single_threaded", "current.txt"),
@@ -233,6 +280,7 @@ int main(int argc, char* argv[]) {
         test_run_samples_and_statistics();
         test_profile(argv[1]);
         test_report_combined_score();
+        test_memory_metadata_serialization();
         test_comparison_requires_matching_configuration();
         test_same_work_in_both_modes();
         return EXIT_SUCCESS;

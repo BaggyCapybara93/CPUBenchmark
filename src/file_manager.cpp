@@ -55,6 +55,8 @@ bool file_manager::write_txt(const benchmark_report& report, const std::string& 
         file << "==========================================\n";
         file << "CPU: " << report.get_cpu_name() << "\n";
         file << "RAM: " << report.get_ram_info() << "\n";
+        file << "RAM Type: " << report.get_ram_type() << "\n";
+        file << "RAM Speed: " << report.get_ram_speed() << "\n";
         file << "OS: " << report.get_os_info() << "\n";
         file << "Compiler: " << report.get_compiler_info() << "\n";
         file << "Logical CPU Cores: " << report.get_logical_cpu_cores() << "\n";
@@ -136,6 +138,8 @@ bool file_manager::write_json(const benchmark_report& report, const std::string&
         j["runConfiguration"] = report.get_run_configuration();
         j["cpuName"] = report.get_cpu_name();
         j["ramInfo"] = report.get_ram_info();
+        j["ramType"] = report.get_ram_type();
+        j["ramSpeed"] = report.get_ram_speed();
         j["systemMetadata"] = {
             {"os", report.get_os_info()},
             {"compiler", report.get_compiler_info()},

@@ -7,6 +7,7 @@
 #include <vector>
 #include <iostream>
 #include <string>
+#include <utility>
 #include <filesystem>
 
 class benchmark_report{
@@ -14,6 +15,8 @@ class benchmark_report{
         std::vector<score>  benchmark_scores_;
         std::string cpuname = "";
         std::string ram_info = "";
+        std::string ram_type_ = "Unavailable";
+        std::string ram_speed_ = "Unavailable";
         std::string os_info = "";
         std::string compiler_info = "";
         std::string cpu_frequency_info = "";
@@ -23,6 +26,7 @@ class benchmark_report{
 
         static std::string collect_cpu_name();
         static std::string collect_ram_info();
+        static std::pair<std::string, std::string> collect_ram_details();
         static std::string collect_os_info();
         static std::string collect_compiler_info();
         static std::string collect_cpu_frequency_info();
@@ -38,6 +42,8 @@ class benchmark_report{
         double get_combined_score() const;
         const std::string& get_cpu_name() const {return cpuname;}
         const std::string& get_ram_info() const {return ram_info;}
+        const std::string& get_ram_type() const {return ram_type_;}
+        const std::string& get_ram_speed() const {return ram_speed_;}
         const std::string& get_os_info() const {return os_info;}
         const std::string& get_compiler_info() const {return compiler_info;}
         const std::string& get_cpu_frequency_info() const {return cpu_frequency_info;}

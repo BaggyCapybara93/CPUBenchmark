@@ -14,6 +14,8 @@
 #include <utility>
 #include <unordered_set>
 #include <functional>
+#include <cstdio>
+#include <set>
 
 #if defined(_WIN32)
 #include <intrin.h>
@@ -24,6 +26,66 @@
 #include <sys/types.h>
 #include <sys/sysctl.h>
 #endif
+
+namespace {
+
+std::string command_output(const char* command) {
+#if defined(_WIN32)
+    FILE* pipe = _popen(command, "r");
+#else
+    FILE* pipe = popen(command, "r");
+#endif
+    if (!pipe) return {};
+    std::string output;
+    char buffer[4096];
+    while (fgets(buffer, sizeof(buffer), pipe) != nullptr && output.size() < 1024 * 1024) {
+        output += buffer;
+    }
+#if defined(_WIN32)
+    _pclose(pipe);
+#else
+    pclose(pipe);
+#endif
+    return output;
+}
+
+std::string join_values(const std::set<std::string>& values) {
+    if (values.empty()) return "Unavailable";
+    std::string result;
+    for (const auto& value : values) {
+        if (!result.empty()) result += " / ";
+        result += value;
+    }
+    return result;
+}
+
+#if defined(__APPLE__) || defined(__linux__)
+std::string trim(std::string value) {
+    const auto first = value.find_first_not_of(" \t\r\n");
+    if (first == std::string::npos) return {};
+    const auto last = value.find_last_not_of(" \t\r\n");
+    return value.substr(first, last - first + 1);
+}
+#endif
+
+#if defined(_WIN32)
+std::string memory_type_name(int code) {
+    switch (code) {
+        case 20: return "DDR";
+        case 21: return "DDR2";
+        case 24: return "DDR3";
+        case 26: return "DDR4";
+        case 27: return "LPDDR";
+        case 29: return "LPDDR3";
+        case 30: return "LPDDR4";
+        case 34: return "DDR5";
+        case 35: return "LPDDR5";
+        default: return {};
+    }
+}
+#endif
+
+}  // namespace
 
 std::string benchmark_report::collect_cpu_name() {
     std::string name;
@@ -149,6 +211,80 @@ std::string benchmark_report::collect_ram_info() {
     return ram_info;
 }
 
+std::pair<std::string, std::string> benchmark_report::collect_ram_details() {
+    std::set<std::string> types;
+    std::set<std::string> speeds;
+#if defined(__APPLE__)
+    const auto output = command_output("/usr/sbin/system_profiler SPMemoryDataType -json 2>/dev/null");
+    const auto data = nlohmann::json::parse(output, nullptr, false);
+    if (data.is_object() && data.contains("SPMemoryDataType") &&
+        data["SPMemoryDataType"].is_array()) {
+        for (const auto& device : data["SPMemoryDataType"]) {
+            if (!device.is_object()) continue;
+            for (const auto& [key, values] : {
+                     std::pair{"dimm_type", &types}, std::pair{"dimm_speed", &speeds}}) {
+                if (device.contains(key) && device[key].is_string()) {
+                    const auto value = trim(device[key].get<std::string>());
+                    if (!value.empty() && value != "Unknown") values->insert(value);
+                }
+            }
+        }
+    }
+#elif defined(__linux__)
+    // SMBIOS data may require elevated access. Leave fields unavailable when it cannot be read.
+    const auto output = command_output("dmidecode --type 17 2>/dev/null");
+    std::istringstream input(output);
+    std::string line;
+    std::string size, type, speed, fallback_speed;
+    const auto add_device = [&]() {
+        if (size.empty() || size == "No Module Installed") return;
+        if (!type.empty() && type != "Unknown" && type != "Other") types.insert(type);
+        const auto& selected_speed = speed.empty() || speed == "Unknown" ? fallback_speed : speed;
+        if (!selected_speed.empty() && selected_speed != "Unknown") speeds.insert(selected_speed);
+    };
+    bool in_device = false;
+    while (std::getline(input, line)) {
+        const auto field = trim(line);
+        if (field == "Memory Device") {
+            if (in_device) add_device();
+            in_device = true;
+            size.clear(); type.clear(); speed.clear(); fallback_speed.clear();
+        } else if (in_device && field.starts_with("Size: ")) {
+            size = field.substr(6);
+        } else if (in_device && field.starts_with("Type: ")) {
+            type = field.substr(6);
+        } else if (in_device && field.starts_with("Configured Memory Speed: ")) {
+            speed = field.substr(25);
+        } else if (in_device && field.starts_with("Speed: ")) {
+            fallback_speed = field.substr(7);
+        }
+    }
+    if (in_device) add_device();
+#elif defined(_WIN32)
+    const auto output = command_output(
+        "powershell -NoProfile -NonInteractive -Command \"Get-CimInstance Win32_PhysicalMemory | "
+        "Select-Object SMBIOSMemoryType,MemoryType,ConfiguredClockSpeed,Speed | "
+        "ConvertTo-Json -Compress\" 2>NUL");
+    const auto data = nlohmann::json::parse(output, nullptr, false);
+    const auto add_device = [&](const nlohmann::json& device) {
+        if (!device.is_object()) return;
+        int type_code = device.value("SMBIOSMemoryType", 0);
+        if (memory_type_name(type_code).empty()) type_code = device.value("MemoryType", 0);
+        const auto type = memory_type_name(type_code);
+        if (!type.empty()) types.insert(type);
+        int speed = device.value("ConfiguredClockSpeed", 0);
+        if (speed <= 0) speed = device.value("Speed", 0);
+        if (speed > 0) speeds.insert(std::to_string(speed) + " MHz");
+    };
+    if (data.is_array()) {
+        for (const auto& device : data) add_device(device);
+    } else {
+        add_device(data);
+    }
+#endif
+    return {join_values(types), join_values(speeds)};
+}
+
 std::string benchmark_report::collect_os_info() {
 #if defined(_WIN32)
     return "Windows";
@@ -209,6 +345,9 @@ std::string benchmark_report::collect_cpu_frequency_info() {
 benchmark_report::benchmark_report() {
     cpuname = collect_cpu_name();
     ram_info = collect_ram_info();
+    const auto [type, speed] = collect_ram_details();
+    ram_type_ = type;
+    ram_speed_ = speed;
     os_info = collect_os_info();
     compiler_info = collect_compiler_info();
     cpu_frequency_info = collect_cpu_frequency_info();
@@ -425,6 +564,8 @@ bool benchmark_report::compare_with_previous(const std::string& save_folder, con
     struct saved_run {
         std::string cpu;
         std::string ram;
+        std::string ram_type;
+        std::string ram_speed;
         std::string configuration;
         std::map<std::string, std::vector<double>> times;
         std::map<std::string, std::vector<double>> scores;
@@ -454,6 +595,10 @@ bool benchmark_report::compare_with_previous(const std::string& save_folder, con
                     run.cpu = line.substr(5);
                 } else if (line.starts_with("RAM: ")) {
                     run.ram = line.substr(5);
+                } else if (line.starts_with("RAM Type: ")) {
+                    run.ram_type = line.substr(10);
+                } else if (line.starts_with("RAM Speed: ")) {
+                    run.ram_speed = line.substr(11);
                 } else if (line.starts_with("Run Configuration: ")) {
                     run.configuration = line.substr(std::string("Run Configuration: ").size());
                 } else if (line == "COMBINED SCORE") {
@@ -497,7 +642,8 @@ bool benchmark_report::compare_with_previous(const std::string& save_folder, con
         for (const auto& path : previous_files) {
             saved_run candidate;
             if (!parse_file(path, candidate) || candidate.configuration != current_configuration ||
-                candidate.cpu != cpuname || candidate.ram != ram_info) {
+                candidate.cpu != cpuname || candidate.ram != ram_info ||
+                candidate.ram_type != ram_type_ || candidate.ram_speed != ram_speed_) {
                 continue;
             }
             bool complete = true;
