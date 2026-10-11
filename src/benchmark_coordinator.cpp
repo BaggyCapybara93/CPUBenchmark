@@ -317,21 +317,50 @@ std::vector<score> benchmark_coordinator::run_specific_benchmarks(
                                        "input elements", work_product({shard_count,
                                            static_cast<std::uint64_t>(sort_size)}));
         } else if (benchmark_name == "memory_bandwidth") {
+            if (settings_->memory_bandwidth_max_mib <= 0) {
+                throw std::invalid_argument("Memory bandwidth working-set limit must be positive");
+            }
+            constexpr std::uint64_t bytes_per_element = 3 * sizeof(double);
+            constexpr std::uint64_t mib = 1024 * 1024;
+            const auto requested_elements = work_product({total_effective, 8});
+            const auto max_elements = work_product({
+                static_cast<std::uint64_t>(settings_->memory_bandwidth_max_mib), mib}) /
+                bytes_per_element;
+            if (max_elements < shard_count) {
+                throw std::invalid_argument(
+                    "Memory bandwidth working-set limit is too small for the shard count");
+            }
+            if (requested_elements > std::numeric_limits<std::size_t>::max()) {
+                throw std::invalid_argument("Memory bandwidth work count is too large");
+            }
+            std::vector<std::size_t> working_set_by_shard(shard_count);
+            std::uint64_t allocated_elements = 0;
+            for (std::size_t shard = 0; shard < shard_count; ++shard) {
+                const auto requested_for_shard = static_cast<std::uint64_t>(
+                    iterations_by_shard[shard]) * 8;
+                const auto cap_for_shard = max_elements / shard_count +
+                    (shard < max_elements % shard_count ? 1U : 0U);
+                const auto working_set = std::min(requested_for_shard, cap_for_shard);
+                working_set_by_shard[shard] = static_cast<std::size_t>(working_set);
+                allocated_elements += working_set;
+            }
             auto workloads = prepare_workloads<benchmark::memory_bandwidth_workload>(
                 pool, worker_count, shard_count, [&](std::size_t shard) {
                     return std::make_unique<benchmark::memory_bandwidth_workload>(
-                        static_cast<std::size_t>(iterations_by_shard[shard]) * 8);
+                        working_set_by_shard[shard]);
                 });
             auto runner = [&]() {
                 run_shards(pool, worker_count, shard_count, [&](std::size_t shard) {
-                    workloads[shard]->run();
+                    workloads[shard]->run(
+                        static_cast<std::size_t>(iterations_by_shard[shard]) * 8);
                 });
             };
             // Each element reads a and b, writes c, then reads c for the checksum.
             constexpr std::uint64_t estimated_bytes_per_element = 4 * sizeof(double);
             elapsed = scorer.add_score("memory_bandwidth", benchmark::run_benchmark(runner, num_runs),
-                                       "elements processed", work_product({total_effective, 8}),
-                                       estimated_bytes_per_element);
+                                       "elements processed", requested_elements,
+                                       estimated_bytes_per_element,
+                                       work_product({allocated_elements, bytes_per_element}));
         } else if (benchmark_name == "pointer_chase" || benchmark_name == "pointer") {
             auto workloads = prepare_workloads<benchmark::pointer_chase_workload>(
                 pool, worker_count, shard_count, [&](std::size_t shard) {

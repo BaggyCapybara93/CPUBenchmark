@@ -128,7 +128,8 @@ public:
     void add_score(const std::string& benchmark_name, double elapsed_time);
     double add_score(const std::string& benchmark_name, std::vector<double> run_times,
                      std::string work_unit = {}, std::uint64_t total_work = 0,
-                     std::uint64_t estimated_bytes_per_work = 0);
+                     std::uint64_t estimated_bytes_per_work = 0,
+                     std::uint64_t working_set_bytes = 0);
     double add_cache_sweep_point(const std::string& benchmark_name,
                                  std::vector<double> run_times,
                                  std::uint64_t total_hops,

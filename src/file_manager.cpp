@@ -100,6 +100,9 @@ bool file_manager::write_txt(const benchmark_report& report, const std::string& 
                 file << "Score: " << std::fixed << std::setprecision(2) << s.score_ << "\n";
             }
             file << "Work: " << s.total_work_ << " " << s.work_unit_ << "\n";
+            if (!s.diagnostic_ && s.working_set_bytes_ != 0) {
+                file << "Working Set: " << s.working_set_bytes_ << " bytes total\n";
+            }
             file << "Time (mean): " << std::fixed << std::setprecision(9) << s.time_ << "s\n";
             if (const auto rate = s.work_per_second()) {
                 file << "Throughput: " << std::fixed << std::setprecision(2) << *rate
@@ -207,7 +210,8 @@ bool file_manager::write_json(const benchmark_report& report, const std::string&
                 {"suiteRepetition", repetition},
                 {"score", s.diagnostic_ ? json(nullptr) : json(s.score_)},
                 {"diagnostic", s.diagnostic_},
-                {"workingSetBytes", s.diagnostic_ ? json(s.working_set_bytes_) : json(nullptr)},
+                {"workingSetBytes", s.working_set_bytes_ != 0
+                    ? json(s.working_set_bytes_) : json(nullptr)},
                 {"activeWorkers", s.diagnostic_ ? json(s.active_workers_) : json(nullptr)},
                 {"effectiveNsPerHop", s.nanoseconds_per_hop()
                     ? json(*s.nanoseconds_per_hop()) : json(nullptr)},
@@ -315,6 +319,8 @@ void file_manager::read_profile_txt(const std::string& path, benchmark_profile& 
                     if (!value.empty()) {
                         profile.num_runs = std::stoi(value);
                     }
+                } else if (key == "memory_bandwidth_max_mib") {
+                    if (!value.empty()) profile.memory_bandwidth_max_mib = std::stoi(value);
                 } else if (key == "cache_sweep_min_kib") {
                     if (!value.empty()) profile.cache_sweep_min_kib = std::stoi(value);
                 } else if (key == "cache_sweep_max_kib") {
@@ -372,6 +378,7 @@ bool file_manager::write_profile_txt(const benchmark_profile& profile, const std
     file << "intensity_multiplier=" << profile.intensity_multiplier << "\n";
     file << "matrix_multiply_size=" << profile.matrix_multiply_size << "\n";
     file << "num_runs=" << profile.num_runs << "\n";
+    file << "memory_bandwidth_max_mib=" << profile.memory_bandwidth_max_mib << "\n";
     file << "cache_sweep_min_kib=" << profile.cache_sweep_min_kib << "\n";
     file << "cache_sweep_max_kib=" << profile.cache_sweep_max_kib << "\n";
     file << "cache_sweep_hops=" << profile.cache_sweep_hops << "\n";
@@ -401,6 +408,7 @@ void file_manager::load_profile(const std::string& profile_path){
     settings_->intensity_multiplier = temp_profile.intensity_multiplier;
     settings_->matrix_multiply_size = temp_profile.matrix_multiply_size;
     settings_->num_runs = temp_profile.num_runs;
+    settings_->memory_bandwidth_max_mib = temp_profile.memory_bandwidth_max_mib;
     settings_->cache_sweep_min_kib = temp_profile.cache_sweep_min_kib;
     settings_->cache_sweep_max_kib = temp_profile.cache_sweep_max_kib;
     settings_->cache_sweep_hops = temp_profile.cache_sweep_hops;

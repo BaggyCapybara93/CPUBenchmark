@@ -22,6 +22,7 @@ struct benchmark_profile{
     int intensity_multiplier = 50;
     int matrix_multiply_size = 128;
     int num_runs = 5;
+    int memory_bandwidth_max_mib = 256;
     int cache_sweep_min_kib = 4;
     int cache_sweep_max_kib = 32768;
     int cache_sweep_hops = 262144;
@@ -38,6 +39,7 @@ struct Settings{
     int matrix_multiply_size = 128;
     int intensity_multiplier = 50;
     int num_runs = 5;
+    int memory_bandwidth_max_mib = 256;
     int cache_sweep_min_kib = 4;
     int cache_sweep_max_kib = 32768;
     int cache_sweep_hops = 262144;

@@ -205,7 +205,8 @@ void test_profile(const std::string& profile_path) {
 
     require(settings->profile.name == "quick_test", "profile name was not loaded");
     require(settings->profile.benchmarks.size() == 2, "profile benchmarks were not loaded");
-    require(settings->iterations == 200 && settings->repeat_count == 3 && settings->num_runs == 4,
+    require(settings->iterations == 200 && settings->repeat_count == 3 && settings->num_runs == 4 &&
+                settings->memory_bandwidth_max_mib == 64,
             "profile execution settings were not applied");
 }
 
@@ -299,7 +300,7 @@ void test_report_serialization() {
     file_manager manager(settings);
     scorer measured;
     measured.add_score("memory_bandwidth", {2.0, 4.0}, "elements processed",
-                       3'000'000'000ULL, 4 * sizeof(double));
+                       3'000'000'000ULL, 4 * sizeof(double), 1024);
     const auto workload = measured.get_scores().front();
     require(workload.work_per_second() &&
                 approximately_equal(*workload.work_per_second(), 1'000'000'000.0) &&
@@ -334,7 +335,8 @@ void test_report_serialization() {
             require(approximately_equal(result.at("workPerSecond").get<double>(), 1'000'000'000.0) &&
                         result.at("throughputUnit") == "elements processed/s" &&
                         approximately_equal(result.at("estimatedLogicalGBps").get<double>(), 32.0) &&
-                        result.at("estimatedBytesPerWork") == 32,
+                        result.at("estimatedBytesPerWork") == 32 &&
+                        result.at("workingSetBytes") == 1024,
                     "JSON report must include work throughput and estimated logical GB/s");
         } else {
             std::ostringstream text;
@@ -343,6 +345,7 @@ void test_report_serialization() {
                         text.str().find("RAM Speed: " + report.get_ram_speed()) != std::string::npos,
                     "text report must include RAM type and speed");
             require(text.str().find("Throughput: 1000000000.00 elements processed/s") != std::string::npos &&
+                        text.str().find("Working Set: 1024 bytes total") != std::string::npos &&
                         text.str().find("Estimated Logical Throughput: 32.000 GB/s") != std::string::npos,
                     "text report must include work throughput and estimated logical GB/s");
         }
@@ -477,6 +480,34 @@ void test_same_work_in_both_modes() {
             "FMA results must report fused operations as their work unit");
 }
 
+void test_memory_bandwidth_working_set_limit() {
+    require(Settings{}.memory_bandwidth_max_mib == 256,
+            "default memory bandwidth working set must be capped at 256 MiB");
+    benchmark::memory_bandwidth_workload small_workload(5);
+    require(approximately_equal(small_workload.run(12), 84.0),
+            "memory bandwidth must process requested elements across repeated passes");
+    auto settings = std::make_shared<Settings>();
+    settings->thread_count = 3;
+    settings->iterations = 100'000;
+    settings->intensity_multiplier = 1;
+    settings->num_runs = 1;
+    settings->memory_bandwidth_max_mib = 1;
+    constexpr std::uint64_t max_elements = (1024 * 1024) / (3 * sizeof(double));
+
+    for (const mode run_mode : {mode::single_threaded, mode::multi_threaded}) {
+        benchmark_report report;
+        benchmark_coordinator coordinator(report, settings);
+        coordinator.start_with_profile({"memory_bandwidth"}, run_mode);
+        const auto& result = report.get_benchmark_scores().front();
+        require(result.total_work_ == 800'000 &&
+                    result.working_set_bytes_ == max_elements * 3 * sizeof(double) &&
+                    report.get_run_configuration().at("memoryBandwidthMaxMiB") == 1 &&
+                    report.get_run_configuration().at("workloads").at("memory_bandwidth")
+                        .at("workingSetBytes") == result.working_set_bytes_,
+                "memory bandwidth must respect the total working-set limit and report actual work");
+    }
+}
+
 void test_cache_size_sweep() {
     const auto directory = std::filesystem::temp_directory_path() /
         ("cpubenchmark_cache_sweep_" + std::to_string(
@@ -582,6 +613,7 @@ int main(int argc, char* argv[]) {
         test_report_serialization();
         test_comparison_requires_matching_configuration();
         test_same_work_in_both_modes();
+        test_memory_bandwidth_working_set_limit();
         test_cache_size_sweep();
         return EXIT_SUCCESS;
     } catch (const std::exception& error) {

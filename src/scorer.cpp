@@ -36,7 +36,8 @@ void scorer::add_score(const std::string& benchmark_name, double elapsed_time) {
 
 double scorer::add_score(const std::string& benchmark_name, std::vector<double> run_times,
                          std::string work_unit, std::uint64_t total_work,
-                         std::uint64_t estimated_bytes_per_work) {
+                         std::uint64_t estimated_bytes_per_work,
+                         std::uint64_t working_set_bytes) {
     if (run_times.empty()) {
         throw std::invalid_argument("Benchmark must have at least one measured run");
     }
@@ -54,6 +55,7 @@ double scorer::add_score(const std::string& benchmark_name, std::vector<double> 
     result.work_unit_ = std::move(work_unit);
     result.total_work_ = total_work;
     result.estimated_bytes_per_work_ = estimated_bytes_per_work;
+    result.working_set_bytes_ = working_set_bytes;
     result.min_time_ = stats.min;
     result.max_time_ = stats.max;
     result.std_dev_ = stats.std_dev;

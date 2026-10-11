@@ -32,7 +32,7 @@ class benchmark_report{
         static std::string collect_cpu_frequency_info();
 
     public:
-        static constexpr int measurement_version = 3;
+        static constexpr int measurement_version = 4;
 
         //Constructor
         benchmark_report();

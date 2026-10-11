@@ -366,6 +366,7 @@ void benchmark_report::set_run_configuration(
         {"intensityMultiplier", settings.intensity_multiplier},
         {"matrixMultiplySize", settings.matrix_multiply_size},
         {"numRuns", settings.num_runs},
+        {"memoryBandwidthMaxMiB", settings.memory_bandwidth_max_mib},
         {"repeatCount", settings.repeat_count},
         {"profileName", settings.profile.benchmarks.empty() ? "full_suite" : settings.profile.name},
         {"os", os_info},
@@ -434,9 +435,11 @@ void benchmark_report::add_score(const std::vector<score>& benchmarks) {
             run_configuration_["workloads"][result.benchmark_name_] = {
                 {"totalWork", result.total_work_}, {"workUnit", result.work_unit_}
             };
-            if (result.diagnostic_) {
+            if (result.working_set_bytes_ != 0) {
                 run_configuration_["workloads"][result.benchmark_name_]["workingSetBytes"] =
                     result.working_set_bytes_;
+            }
+            if (result.diagnostic_) {
                 run_configuration_["workloads"][result.benchmark_name_]["activeWorkers"] =
                     result.active_workers_;
             }

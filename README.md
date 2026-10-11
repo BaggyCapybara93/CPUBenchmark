@@ -81,6 +81,7 @@ num_runs=3
 | `intensity_multiplier` | Intensity multiplier | 50 |
 | `matrix_multiply_size` | Matrix size | 128 |
 | `num_runs` | Number of runs | 5 |
+| `memory_bandwidth_max_mib` | Maximum total memory bandwidth working set (MiB) | 256 |
 | `cache_sweep_min_kib` | Smallest cache sweep working set (power of two, KiB) | 4 |
 | `cache_sweep_max_kib` | Largest cache sweep working set (power of two, KiB; up to 65536) | 32768 |
 | `cache_sweep_hops` | Pointer hops per active worker at each size | 262144 |

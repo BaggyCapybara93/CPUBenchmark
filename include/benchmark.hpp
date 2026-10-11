@@ -64,7 +64,7 @@ public:
 
     struct memory_bandwidth_workload {
         explicit memory_bandwidth_workload(std::size_t size);
-        void run();
+        double run(std::size_t elements_to_process);
 
     private:
         std::vector<double> a_;

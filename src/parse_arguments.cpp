@@ -57,6 +57,7 @@ void parse_arguments::parse(int argc, char* argv[]) {
             ("matrixMultiplySize,mm", po::value<int>(&settings_.get()->matrix_multiply_size), "Matrix multiply size")
             ("repeat,r", po::value<int>(&settings_.get()->repeat_count), "Repeat benchmark N times")
             ("numRuns,n", po::value<int>(&settings_.get()->num_runs), "Number of runs")
+            ("memoryBandwidthMaxMiB", po::value<int>(), "Maximum total memory bandwidth working set in MiB")
             ("saveMethod,sm", po::value<std::string>(&settings_.get()->save_method), "Method used for saving scores(JSON/txt).")
             ("weights,w", po::value<std::string>(), "Override scoring weights as comma-separated name=value pairs")
             ("baselineTimes,bt", po::value<std::string>(), "Override baseline times as comma-separated name=value pairs")
@@ -83,6 +84,10 @@ void parse_arguments::parse(int argc, char* argv[]) {
             fm.load_profile(profile_path);
         }
 
+        if (vm.count("memoryBandwidthMaxMiB")) {
+            settings_->memory_bandwidth_max_mib = vm["memoryBandwidthMaxMiB"].as<int>();
+        }
+
         if (vm.count("weights")) {
             std::unordered_map<std::string, double> parsed_weights;
             parse_key_value_map(vm["weights"].as<std::string>(), parsed_weights);
@@ -102,8 +107,9 @@ void parse_arguments::parse(int argc, char* argv[]) {
         const Settings& parsed_settings = *settings_;
         if (parsed_settings.thread_count <= 0 || parsed_settings.iterations <= 0 ||
             parsed_settings.intensity_multiplier <= 0 || parsed_settings.matrix_multiply_size <= 0 ||
-            parsed_settings.repeat_count <= 0 || parsed_settings.num_runs <= 0) {
-            throw std::invalid_argument("threads, iterations, repeat, numRuns, intensityMultiplier, and matrixMultiplySize must be positive");
+            parsed_settings.repeat_count <= 0 || parsed_settings.num_runs <= 0 ||
+            parsed_settings.memory_bandwidth_max_mib <= 0) {
+            throw std::invalid_argument("threads, iterations, repeat, numRuns, intensityMultiplier, matrixMultiplySize, and memoryBandwidthMaxMiB must be positive");
         }
         if (!vm.count("singleThreaded") &&
             parsed_settings.iterations < parsed_settings.thread_count) {

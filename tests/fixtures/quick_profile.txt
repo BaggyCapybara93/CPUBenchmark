@@ -5,3 +5,4 @@ repeat_count=3
 intensity_multiplier=2
 matrix_multiply_size=16
 num_runs=4
+memory_bandwidth_max_mib=64

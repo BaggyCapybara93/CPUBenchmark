@@ -318,23 +318,31 @@ void benchmark::sorting_benchmark(int size) {
 benchmark::memory_bandwidth_workload::memory_bandwidth_workload(std::size_t size)
     : a_(size, 1.0), b_(size, 2.0), c_(size, 0.0) {}
 
-void benchmark::memory_bandwidth_workload::run() {
-    const double scalar = 3.0;
-
-    for (std::size_t i = 0; i < c_.size(); ++i) {
-        c_[i] = a_[i] + scalar * b_[i];
+double benchmark::memory_bandwidth_workload::run(std::size_t elements_to_process) {
+    if (c_.empty()) {
+        throw std::invalid_argument("Memory bandwidth working set must not be empty");
     }
-
+    const double scalar = 3.0;
     double sum = 0.0;
-    for (double v : c_) sum += v;
+    while (elements_to_process != 0) {
+        const std::size_t count = std::min(elements_to_process, c_.size());
+        for (std::size_t i = 0; i < count; ++i) {
+            c_[i] = a_[i] + scalar * b_[i];
+        }
+        for (std::size_t i = 0; i < count; ++i) {
+            sum += c_[i];
+        }
+        elements_to_process -= count;
+    }
 
     escape(sum);
     clobber();
+    return sum;
 }
 
 void benchmark::memory_bandwidth_benchmark(size_t size) {
     memory_bandwidth_workload workload(size);
-    workload.run();
+    workload.run(size);
 }
 
 benchmark::pointer_chase_workload::pointer_chase_workload(std::size_t size)
