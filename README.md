@@ -60,4 +60,4 @@ Profile settings include `repeat_count`, `matrix_multiply_size`, `memory_bandwid
 
 ## License
 
-MIT; see [LICENSE](LICENSE).
+0BSD (Zero-Clause BSD); see [LICENSE](LICENSE).
