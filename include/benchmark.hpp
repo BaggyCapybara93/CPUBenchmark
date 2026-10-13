@@ -1,5 +1,6 @@
 #pragma once
 #include "scorer.hpp"
+#include "benchmark_interrupt.hpp"
 #include <chrono>
 #include <cmath>
 #include <iostream>
@@ -125,7 +126,9 @@ public:
         //Warmup
         const int warmup_runs = 5;
         for (int i = 0; i < warmup_runs; ++i) {
+            benchmark_interrupt::check();
             std::invoke(setup);
+            benchmark_interrupt::check();
             benchmark::execute(func);
         }
 
@@ -134,11 +137,14 @@ public:
         run_times.reserve(static_cast<std::size_t>(num_runs));
         
         for (int i = 0; i < num_runs; ++i) {
+            benchmark_interrupt::check();
             std::invoke(setup);
+            benchmark_interrupt::check();
             double duration = benchmark::time(func);
             run_times.push_back(duration);
         }
 
+        benchmark_interrupt::check();
         return run_times;
     }
 

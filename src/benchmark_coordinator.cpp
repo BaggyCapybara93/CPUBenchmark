@@ -188,6 +188,7 @@ std::vector<score> benchmark_coordinator::run_specific_benchmarks(
     double total_time = 0.0;
 
     for (const auto& benchmark_name : benchmark_names) {
+        benchmark_interrupt::check();
         std::cout << "\n=== Running benchmark: " << benchmark_name << " ===\n";
         double elapsed = 0.0;
 
@@ -392,6 +393,7 @@ std::vector<score> benchmark_coordinator::run_specific_benchmarks(
                      static_cast<std::uint64_t>(settings_->cache_sweep_min_kib);
                  size_kib <= static_cast<std::uint64_t>(settings_->cache_sweep_max_kib);
                  size_kib *= 2) {
+                benchmark_interrupt::check();
                 const std::size_t size_bytes = static_cast<std::size_t>(size_kib * 1024);
                 auto workloads = prepare_workloads<benchmark::cache_sweep_workload>(
                     pool, worker_count, active_workers, [&](std::size_t) {

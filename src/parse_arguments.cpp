@@ -50,6 +50,8 @@ void parse_arguments::parse(int argc, char* argv[]) {
 
             ("singleThreaded,st", "Run in single-threaded mode")
             ("multiThreaded,mt", "Run in multi-threaded mode")
+            ("infinite", "Stress test until Ctrl+C (defaults to multi-threaded; no saved reports)")
+            ("stress", "Alias for --infinite")
 
             ("threads,t", po::value<int>(&settings_.get()->thread_count), "Number of threads")
             ("iterations,i", po::value<int>(&settings_.get()->iterations), "Iterations per thread")
@@ -87,6 +89,8 @@ void parse_arguments::parse(int argc, char* argv[]) {
         if (vm.count("memoryBandwidthMaxMiB")) {
             settings_->memory_bandwidth_max_mib = vm["memoryBandwidthMaxMiB"].as<int>();
         }
+
+        settings_->infinite = vm.count("infinite") != 0 || vm.count("stress") != 0;
 
         if (vm.count("weights")) {
             std::unordered_map<std::string, double> parsed_weights;
@@ -137,7 +141,12 @@ void parse_arguments::parse(int argc, char* argv[]) {
         else if (vm.count("multiThreaded"))
             settings_.get()->mode = mode::multi_threaded;
         else
-            settings_.get()->mode = mode::both; // default
+            settings_.get()->mode = settings_->infinite ? mode::multi_threaded : mode::both;
+
+        // Infinite mode repeats individual suites without retaining repeat batches.
+        if (settings_->infinite) {
+            settings_->repeat_count = 1;
+        }
 
     } catch(const std::exception& e){
         throw std::runtime_error("Argument parsing error: " + std::string(e.what()));

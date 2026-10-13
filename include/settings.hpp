@@ -31,6 +31,7 @@ struct benchmark_profile{
 
 struct Settings{
     mode mode = mode::invalid;
+    bool infinite = false;
     bool save_results = true;
     std::string save_method = "txt"; //Make this into an enum when more methods are added
     int thread_count = static_cast<int>(std::thread::hardware_concurrency());

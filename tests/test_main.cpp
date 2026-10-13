@@ -29,6 +29,76 @@ bool approximately_equal(double actual, double expected) {
     return std::abs(actual - expected) < 1e-9 * std::max(1.0, std::abs(expected));
 }
 
+void test_stress_arguments(const std::string& profile_path) {
+    const auto parse = [](std::vector<std::string> arguments) {
+        std::vector<char*> argv;
+        for (auto& argument : arguments) argv.push_back(argument.data());
+        auto settings = std::make_shared<Settings>();
+        parse_arguments parser(static_cast<int>(argv.size()), argv.data(), settings);
+        return settings;
+    };
+    const auto ordinary = parse({"CPUBenchmark", "--threads", "2", "--repeat", "3"});
+    require(!ordinary->infinite && ordinary->mode == mode::both && ordinary->repeat_count == 3,
+            "ordinary runs must retain both modes and finite repetitions");
+    for (const std::string option : {"--infinite", "--stress"}) {
+        const auto stress = parse({"CPUBenchmark", option, "--threads", "2", "--repeat", "3"});
+        require(stress->infinite && stress->mode == mode::multi_threaded &&
+                    stress->thread_count == 2 && stress->repeat_count == 1,
+                "stress flags must default to multi-threaded and ignore finite repeats");
+    }
+    const auto profile = parse({"CPUBenchmark", "--infinite", "--singleThreaded",
+                                "--threads", "2", "--profile", profile_path});
+    require(profile->infinite && profile->mode == mode::single_threaded &&
+                !profile->profile.benchmarks.empty() && profile->repeat_count == 1 &&
+                profile->num_runs == 4,
+            "stress mode must honor profiles and explicit mode but ignore profile repeats");
+    const auto help = parse({"CPUBenchmark", "--infinite", "--help"});
+    require(help->mode == mode::none, "stress help must not launch workloads");
+}
+
+void test_stress_interruption() {
+    // Interrupt before execution, during warmups, and during measured samples.
+    for (const int stop_after : {0, 1, 5, 6, 7}) {
+        benchmark_interrupt::requested.store(stop_after == 0);
+        int executions = 0;
+        bool stopped = false;
+        try {
+            benchmark::run_benchmark([&]() {
+                ++executions;
+                if (executions == stop_after) benchmark_interrupt::request_stop(0);
+            }, 2);
+        } catch (const benchmark_interrupt::interrupted&) {
+            stopped = true;
+        }
+        benchmark_interrupt::requested.store(false);
+        require(stopped && executions == stop_after,
+                "interruption must not start another workload or return partial samples");
+    }
+
+    int executions = 0;
+    bool stopped = false;
+    try {
+        benchmark::run_benchmark([&]() { ++executions; }, 2,
+                                 []() { benchmark_interrupt::request_stop(0); });
+    } catch (const benchmark_interrupt::interrupted&) {
+        stopped = true;
+    }
+    benchmark_interrupt::requested.store(false);
+    require(stopped && executions == 0, "a stop during setup must skip the workload");
+
+    stopped = false;
+    try {
+        benchmark_thread_pool pool(2);
+        benchmark::run_benchmark([&]() {
+            pool.run_all([]() { benchmark_interrupt::request_stop(0); });
+        }, 2);
+    } catch (const benchmark_interrupt::interrupted&) {
+        stopped = true;
+    }
+    benchmark_interrupt::requested.store(false);
+    require(stopped, "a worker stop request must unwind and join the pool cleanly");
+}
+
 void test_scorer() {
     const std::unordered_map<std::string, double> weights = {
         {"alpha", 1.0},
@@ -603,6 +673,8 @@ void test_cache_size_sweep() {
 int main(int argc, char* argv[]) {
     try {
         require(argc == 2, "expected a profile fixture path");
+        test_stress_arguments(argv[1]);
+        test_stress_interruption();
         test_scorer();
         test_run_samples_and_statistics();
         test_arithmetic_kernels();

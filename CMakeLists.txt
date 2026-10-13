@@ -57,6 +57,7 @@ include(CTest)
 if(BUILD_TESTING)
     add_executable(CPUBenchmarkTests
         tests/test_main.cpp
+        src/parse_arguments.cpp
         src/benchmark.cpp
         src/benchmark_coordinator.cpp
         src/scorer.cpp
@@ -65,8 +66,8 @@ if(BUILD_TESTING)
         src/thread_affinity.cpp
     )
     set_build_metadata(CPUBenchmarkTests)
-    target_include_directories(CPUBenchmarkTests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
-    target_link_libraries(CPUBenchmarkTests PRIVATE nlohmann_json::nlohmann_json Threads::Threads)
+    target_include_directories(CPUBenchmarkTests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include ${Boost_INCLUDE_DIRS})
+    target_link_libraries(CPUBenchmarkTests PRIVATE Boost::program_options nlohmann_json::nlohmann_json Threads::Threads)
 
     add_test(
         NAME CPUBenchmarkTests

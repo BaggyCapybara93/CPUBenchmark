@@ -27,6 +27,23 @@ From the build directory:
 
 Results are saved in `scores/` beside the executable. `--numRuns` sets the measured samples per benchmark, and `--repeat` repeats the suite. The default memory bandwidth working set is capped at 256 MiB across all shards; change it with `--memoryBandwidthMaxMiB N`.
 
+## Stress testing
+
+```bash
+./CPUBenchmark --infinite                         # Repeat using all available threads
+./CPUBenchmark --stress --threads 4               # Alias, with four worker threads
+./CPUBenchmark --infinite --singleThreaded         # Single-threaded stress test
+./CPUBenchmark --infinite --profile=quick.txt      # Repeat only the profile's workloads
+```
+
+Stress mode repeats until Ctrl+C (or SIGTERM), then prints the completed cycle count
+and elapsed time. Shutdown waits for the current workload/setup call to finish;
+large workloads can delay it. Profiles, workload settings, and `--numRuns` still
+apply; `--repeat` and a profile's `repeat_count` are ignored. Stress mode defaults
+to multi-threaded execution. Results appear in the terminal, with no report files
+saved and no accumulation of samples across cycles. This generates sustained
+load; it does not add hardware-error detection.
+
 ## Profiles
 
 A profile selects benchmarks and their settings. Create a text file such as `quick.txt`:

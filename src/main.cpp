@@ -7,6 +7,74 @@
 #include <filesystem>
 #include <iostream>
 #include <memory>
+#include <chrono>
+#include <csignal>
+#include <cstdint>
+#include <stdexcept>
+
+namespace {
+class stress_signal_guard {
+    using handler = void (*)(int);
+    handler previous_int_;
+    handler previous_term_;
+
+public:
+    stress_signal_guard() {
+        benchmark_interrupt::requested.store(false, std::memory_order_relaxed);
+        previous_int_ = std::signal(SIGINT, benchmark_interrupt::request_stop);
+        if (previous_int_ == SIG_ERR) {
+            throw std::runtime_error("Cannot install Ctrl+C handler");
+        }
+        previous_term_ = std::signal(SIGTERM, benchmark_interrupt::request_stop);
+        if (previous_term_ == SIG_ERR) {
+            std::signal(SIGINT, previous_int_);
+            throw std::runtime_error("Cannot install termination handler");
+        }
+    }
+
+    ~stress_signal_guard() {
+        std::signal(SIGINT, previous_int_);
+        std::signal(SIGTERM, previous_term_);
+    }
+
+    stress_signal_guard(const stress_signal_guard&) = delete;
+    stress_signal_guard& operator=(const stress_signal_guard&) = delete;
+};
+
+int run_stress_test(const std::shared_ptr<Settings>& settings) {
+    stress_signal_guard signals;
+    const auto started = std::chrono::steady_clock::now();
+    std::uint64_t completed = 0;
+    std::cout << "Infinite stress test ("
+              << (settings->mode == mode::single_threaded ? 1 : settings->thread_count)
+              << " threads). Press Ctrl+C to stop after the current workload call.\n"
+              << "Results are printed only; --repeat is ignored.\n";
+    if (!settings->profile.benchmarks.empty()) {
+        std::cout << "Profile: " << settings->profile.name << '\n';
+    }
+    try {
+        while (true) {
+            benchmark_interrupt::check();
+            std::cout << "\n=== Stress cycle " << (completed + 1) << " ===\n" << std::flush;
+            // Discard each cycle's samples so memory usage stays bounded.
+            benchmark_report report;
+            benchmark_coordinator coordinator(report, settings);
+            if (settings->profile.benchmarks.empty()) {
+                coordinator.start(settings->mode);
+            } else {
+                coordinator.start_with_profile(settings->profile.benchmarks, settings->mode);
+            }
+            ++completed;
+        }
+    } catch (const benchmark_interrupt::interrupted&) {
+        const double elapsed = std::chrono::duration<double>(
+            std::chrono::steady_clock::now() - started).count();
+        std::cout << "\nStress test stopped. Completed " << completed
+                  << " cycles in " << elapsed << " seconds.\n";
+    }
+    return 0;
+}
+} // namespace
 
 std::filesystem::path get_output_root(char* argv[]) {
     if (argv == nullptr || argv[0] == nullptr || argv[0][0] == '\0') {
@@ -33,6 +101,9 @@ static int run_cli(int argc, char* argv[]) {
     std::shared_ptr<Settings> settings = std::make_shared<Settings>();
 
     parse_arguments args(argc, argv, settings);
+    if (settings->infinite && settings->mode != mode::none) {
+        return run_stress_test(settings);
+    }
     file_manager fm(settings);
     const std::filesystem::path output_root = get_output_root(argv);
     
